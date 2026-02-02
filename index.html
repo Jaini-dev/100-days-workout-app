@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>100 Days of Workout</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#6366f1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Splash Screen -->
+    <div id="splash-screen" class="screen active">
+        <div class="splash-content">
+            <div class="splash-icon">💪</div>
+            <h1>100 Days of Workout</h1>
+            <p>Season 6</p>
+            <div class="splash-loader"></div>
+        </div>
+    </div>
+
+    <!-- Onboarding Screen (First Time) -->
+    <div id="onboarding-screen" class="screen">
+        <div class="container onboarding-container">
+            <div class="onboarding-slide active" data-slide="1">
+                <div class="onboarding-icon">🎯</div>
+                <h2>Welcome to the Challenge!</h2>
+                <p>Join the 100 Days of Workout challenge. Track your daily workouts, compete with friends, and build an unbreakable streak!</p>
+            </div>
+            <div class="onboarding-slide" data-slide="2">
+                <div class="onboarding-icon">✅</div>
+                <h2>Simple Daily Check-in</h2>
+                <p>Just tap YES or NO each day. That's it! No complicated logging, no excuses. Just show up.</p>
+            </div>
+            <div class="onboarding-slide" data-slide="3">
+                <div class="onboarding-icon">🏆</div>
+                <h2>Climb the Leaderboard</h2>
+                <p>See how you stack up against the group. Build your streak, earn your spot at the top!</p>
+            </div>
+            <div class="onboarding-dots">
+                <span class="dot active" data-dot="1"></span>
+                <span class="dot" data-dot="2"></span>
+                <span class="dot" data-dot="3"></span>
+            </div>
+            <button id="onboarding-next" class="btn-primary">Next</button>
+            <button id="onboarding-skip" class="btn-text">Skip</button>
+        </div>
+    </div>
+
+    <!-- Login Screen -->
+    <div id="login-screen" class="screen">
+        <div class="container">
+            <div class="logo-section">
+                <div class="logo-icon">💪</div>
+                <h1>100 Days of Workout</h1>
+                <p class="tagline">Season 6</p>
+            </div>
+
+            <div class="login-form">
+                <h3 class="form-title">Login to Continue</h3>
+                <div class="form-group">
+                    <label for="login-phone">WhatsApp Number</label>
+                    <input type="tel" id="login-phone" placeholder="9876543210" maxlength="10" inputmode="numeric">
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" placeholder="Enter your password">
+                    <span class="input-hint">First time? Enter any password to create account</span>
+                </div>
+                <button id="login-btn" class="btn-primary">
+                    <span>Login / Register 💪</span>
+                </button>
+
+                <div class="form-divider">
+                    <span>or</span>
+                </div>
+
+                <a href="#" id="admin-login-link" class="admin-link">🔐 Admin Login</a>
+            </div>
+
+            <div class="motivation-quote" id="login-quote">
+                <p>"The only bad workout is the one that didn't happen."</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Registration Screen (New User) - Updated with Goal & Commitment -->
+    <div id="register-screen" class="screen">
+        <div class="container">
+            <div class="logo-section small">
+                <div class="logo-icon">💪</div>
+                <h1>Join the Challenge!</h1>
+                <p class="tagline">Create your account</p>
+            </div>
+
+            <div class="login-form">
+                <div class="form-group">
+                    <label for="register-name">Your Name</label>
+                    <input type="text" id="register-name" placeholder="Enter your full name" maxlength="30">
+                </div>
+                <div class="form-group">
+                    <label for="register-phone">WhatsApp Number</label>
+                    <input type="tel" id="register-phone" placeholder="9876543210" maxlength="10" inputmode="numeric">
+                </div>
+                <div class="form-group">
+                    <label for="register-password">Create Password</label>
+                    <input type="password" id="register-password" placeholder="At least 4 characters">
+                </div>
+                <div class="form-group">
+                    <label for="register-confirm-password">Confirm Password</label>
+                    <input type="password" id="register-confirm-password" placeholder="Re-enter password">
+                </div>
+
+                <!-- NEW: Goal and Commitment Fields -->
+                <div class="form-section-title">🎯 Your Why</div>
+                <div class="form-group">
+                    <label for="register-goal">What's your goal for this challenge?</label>
+                    <input type="text" id="register-goal" placeholder="e.g., Lose 5kg, Build stamina, Run a marathon">
+                    <span class="input-hint">This will help keep you motivated!</span>
+                </div>
+                <div class="form-group">
+                    <label for="register-commitment">Your daily commitment</label>
+                    <input type="text" id="register-commitment" placeholder="e.g., 30 mins workout, 1 hour gym">
+                    <span class="input-hint">What will you do each day?</span>
+                </div>
+
+                <button id="register-btn" class="btn-primary">
+                    <span>Start My Journey! 🚀</span>
+                </button>
+                <button id="back-to-login-from-register" class="btn-text">← Back to Login</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Login Screen -->
+    <div id="admin-login-screen" class="screen">
+        <div class="container">
+            <div class="logo-section small">
+                <div class="logo-icon">🔐</div>
+                <h1>Admin Login</h1>
+                <p class="tagline">Manage the challenge</p>
+            </div>
+
+            <div class="login-form">
+                <div class="form-group">
+                    <label for="admin-code">Admin Code</label>
+                    <input type="password" id="admin-code" placeholder="Enter admin secret code">
+                    <span class="input-hint">Get this from the challenge organizer</span>
+                </div>
+                <div class="form-group">
+                    <label for="admin-name">Your Name</label>
+                    <input type="text" id="admin-name" placeholder="Admin name" maxlength="30">
+                </div>
+                <div class="form-group">
+                    <label for="admin-phone">Phone Number</label>
+                    <input type="tel" id="admin-phone" placeholder="9876543210" maxlength="10" inputmode="numeric">
+                </div>
+                <div class="form-group">
+                    <label for="admin-password">Password</label>
+                    <input type="password" id="admin-password" placeholder="Create admin password">
+                </div>
+                <button id="admin-login-btn" class="btn-primary">
+                    <span>Access Admin Panel 🔓</span>
+                </button>
+                <button id="back-to-login" class="btn-text">← Back to User Login</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="dashboard-screen" class="screen">
+        <div class="container">
+            <!-- Header -->
+            <div class="header">
+                <div class="greeting">
+                    <span class="wave">👋</span>
+                    <h2>Hey, <span id="user-name">Champ</span></h2>
+                </div>
+                <div class="header-right">
+                    <div class="day-badge">
+                        <span id="current-day">1</span>/100
+                    </div>
+                    <button class="icon-btn" onclick="refreshDashboard()" title="Refresh">🔄</button>
+                    <button class="icon-btn" id="settings-btn" onclick="showSettings()">⚙️</button>
+                </div>
+            </div>
+
+            <!-- Goal Reminder (shows occasionally) -->
+            <div id="goal-reminder" class="goal-reminder" style="display: none;">
+                <!-- Dynamically rendered -->
+            </div>
+
+            <!-- Daily Motivation -->
+            <div class="daily-motivation" id="daily-motivation">
+                <div class="motivation-icon">💭</div>
+                <p id="motivation-text">"Success is the sum of small efforts repeated day in and day out."</p>
+            </div>
+
+            <!-- Streak Card -->
+            <div class="streak-card clickable-card" id="streak-card" onclick="showTab('calendar')">
+                <div class="streak-flames" id="streak-flames"></div>
+                <div class="streak-number" id="streak-count">0</div>
+                <div class="streak-label">Day Streak</div>
+                <div class="streak-message" id="streak-message">Start your streak today!</div>
+            </div>
+
+            <!-- Today's Check-in -->
+            <div class="checkin-section" id="checkin-section">
+                <h3>Did you workout today?</h3>
+                <p class="date-display" id="today-date"></p>
+                <a href="#" class="update-past-link" onclick="showTab('calendar'); return false;">📅 Update past records</a>
+
+                <div class="checkin-buttons-v2" id="checkin-buttons">
+                    <button class="checkin-btn-v2 yes" id="btn-yes">
+                        <span class="btn-icon">💪</span>
+                        <span class="btn-text">Worked Out!</span>
+                    </button>
+                    <button class="checkin-btn-v2 rest" id="btn-rest">
+                        <span class="btn-icon">🧘</span>
+                        <span class="btn-text">Rest Day</span>
+                    </button>
+                    <button class="checkin-btn-v2 no" id="btn-no">
+                        <span class="btn-icon">😴</span>
+                        <span class="btn-text">Skipped</span>
+                    </button>
+                </div>
+
+                <div class="checkin-done" id="checkin-done" style="display: none;">
+                    <div class="done-icon" id="done-icon">✅</div>
+                    <div class="done-status" id="done-status">Worked Out!</div>
+                    <p id="done-message">You're all set for today!</p>
+                    <div class="checkin-actions">
+                        <button class="btn-text" id="change-checkin">Change response</button>
+                        <button class="btn-text btn-undo" id="undo-checkin">Undo check-in</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Personal Progress Section -->
+            <div id="personal-progress-section" class="personal-progress-section">
+                <!-- Dynamically rendered -->
+            </div>
+
+            <!-- Past Days Section -->
+            <div class="past-days-section" id="past-days-section" style="display: none;">
+                <!-- Dynamically rendered -->
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card clickable-card" onclick="showTab('calendar')">
+                    <div class="stat-value" id="total-workouts">0</div>
+                    <div class="stat-label">Total Workouts</div>
+                </div>
+                <div class="stat-card clickable-card" onclick="showTab('summary')">
+                    <div class="stat-value" id="completion-rate">0%</div>
+                    <div class="stat-label">Completion Rate</div>
+                </div>
+                <div class="stat-card clickable-card" onclick="showTab('calendar')">
+                    <div class="stat-value" id="days-remaining">100</div>
+                    <div class="stat-label">Days Left</div>
+                </div>
+                <div class="stat-card clickable-card" id="rank-card" onclick="showTab('leaderboard')">
+                    <div class="stat-value" id="your-rank">#-</div>
+                    <div class="stat-label">Your Rank</div>
+                </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="progress-section">
+                <div class="progress-header">
+                    <span>Overall Progress</span>
+                    <span id="progress-text">0/100 days</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+            </div>
+
+            <!-- Mini Leaderboard Preview -->
+            <div class="mini-leaderboard" onclick="showTab('leaderboard')">
+                <div class="mini-leaderboard-header">
+                    <span>🏆 Top Performers</span>
+                    <span class="view-all">View All →</span>
+                </div>
+                <div id="mini-leaderboard"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaderboard Screen -->
+    <div id="leaderboard-screen" class="screen">
+        <div class="container">
+            <div class="screen-header">
+                <button class="back-btn" onclick="showTab('home')">←</button>
+                <h2>🏆 Leaderboard</h2>
+                <button class="refresh-btn" onclick="refreshLeaderboard()" title="Refresh">🔄</button>
+            </div>
+
+            <!-- Leaderboard Filters -->
+            <div class="lb-filter-bar">
+                <button class="lb-filter-btn active" data-category="thisWeek">This Week</button>
+                <button class="lb-filter-btn" data-category="comeback">Comeback</button>
+                <button class="lb-filter-btn" data-category="streaks">Streaks</button>
+            </div>
+
+            <!-- Category Description -->
+            <div class="leaderboard-category-info" id="leaderboard-category-info">
+                <div class="category-title" id="category-title">🔥 This Week's Warriors</div>
+                <div class="category-desc" id="category-desc">Who's crushing it this week?</div>
+            </div>
+
+            <div class="leaderboard-podium" id="podium">
+                <!-- Top 3 will be inserted here -->
+            </div>
+
+            <div class="leaderboard-list" id="leaderboard-list">
+                <!-- Rest of leaderboard -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Calendar Screen -->
+    <div id="calendar-screen" class="screen">
+        <div class="container">
+            <div class="screen-header">
+                <button class="back-btn" onclick="showTab('home')">←</button>
+                <h2>📅 Your Journey</h2>
+                <button class="refresh-btn" onclick="refreshCalendar()" title="Refresh">🔄</button>
+            </div>
+
+            <div id="calendar-container">
+                <!-- Calendar will be rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Participants Screen -->
+    <div id="participants-screen" class="screen">
+        <div class="container">
+            <div class="screen-header">
+                <button class="back-btn" onclick="showTab('home')">←</button>
+                <h2>👥 All Participants</h2>
+                <button class="refresh-btn" onclick="refreshParticipants()" title="Refresh">🔄</button>
+            </div>
+
+            <div class="participants-stats">
+                <div class="participant-stat-card">
+                    <span class="stat-number" id="participants-total">0</span>
+                    <span class="stat-label">Total</span>
+                </div>
+                <div class="participant-stat-card">
+                    <span class="stat-number" id="participants-active">0</span>
+                    <span class="stat-label">Active Today</span>
+                </div>
+            </div>
+
+            <div class="participants-search">
+                <input type="text" id="participants-search-input" placeholder="Search by name..." oninput="filterParticipants()">
+            </div>
+
+            <div id="participants-list-container">
+                <!-- Dynamically rendered -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Screen -->
+    <div id="summary-screen" class="screen">
+        <div class="container">
+            <div class="screen-header">
+                <button class="back-btn" onclick="showTab('home')">←</button>
+                <h2>📊 Your Progress</h2>
+                <button class="refresh-btn" onclick="refreshSummary()" title="Refresh">🔄</button>
+            </div>
+
+            <div class="summary-card">
+                <div class="summary-header">
+                    <h3 id="summary-name">User</h3>
+                    <p>Day <span id="summary-day">1</span> of 100</p>
+                </div>
+                <div class="summary-stats">
+                    <div class="summary-stat">
+                        <span class="summary-value" id="summary-total">0</span>
+                        <span class="summary-label">Workouts</span>
+                    </div>
+                    <div class="summary-stat">
+                        <span class="summary-value" id="summary-streak">0</span>
+                        <span class="summary-label">Streak</span>
+                    </div>
+                    <div class="summary-stat">
+                        <span class="summary-value" id="summary-rate">0%</span>
+                        <span class="summary-label">Rate</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="weekly-breakdown" id="weekly-breakdown">
+                <!-- Dynamically rendered -->
+            </div>
+
+            <button class="btn-primary" onclick="shareProgress()">
+                <span>📤</span> Share Progress
+            </button>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard Screen -->
+    <div id="admin-dashboard-screen" class="screen">
+        <div class="container">
+            <div class="screen-header">
+                <button class="back-btn" id="admin-back-btn">←</button>
+                <h2>👑 Admin Dashboard</h2>
+                <button class="icon-btn" onclick="renderAdminDashboard()">🔄</button>
+            </div>
+
+            <!-- Challenge Settings Display -->
+            <div id="admin-challenge-settings" class="admin-challenge-settings">
+                <!-- Dynamically rendered -->
+            </div>
+
+            <!-- Admin Stats -->
+            <div class="admin-stats-grid">
+                <div class="admin-stat-card">
+                    <div class="admin-stat-icon">👥</div>
+                    <div class="admin-stat-value" id="admin-total-participants">0</div>
+                    <div class="admin-stat-label">Participants</div>
+                </div>
+                <div class="admin-stat-card green">
+                    <div class="admin-stat-icon">✅</div>
+                    <div class="admin-stat-value" id="admin-today-yes">0</div>
+                    <div class="admin-stat-label">Today Yes</div>
+                </div>
+                <div class="admin-stat-card red">
+                    <div class="admin-stat-icon">❌</div>
+                    <div class="admin-stat-value" id="admin-today-no">0</div>
+                    <div class="admin-stat-label">Today No</div>
+                </div>
+                <div class="admin-stat-card yellow">
+                    <div class="admin-stat-icon">⏳</div>
+                    <div class="admin-stat-value" id="admin-today-pending">0</div>
+                    <div class="admin-stat-label">Pending</div>
+                </div>
+            </div>
+
+            <!-- Share Group Progress -->
+            <div class="admin-share-section">
+                <h4>📤 Share Group Progress</h4>
+                <div class="admin-actions">
+                    <button class="btn-primary share-btn" onclick="shareGroupProgress('today')">
+                        <span>📊</span> Today's Update
+                    </button>
+                </div>
+                <div class="admin-actions">
+                    <button class="btn-secondary" onclick="shareGroupProgress('week')">
+                        <span>📅</span> This Week
+                    </button>
+                    <button class="btn-secondary" onclick="shareGroupProgress('leaderboard')">
+                        <span>🏆</span> Leaderboard
+                    </button>
+                </div>
+            </div>
+
+            <!-- Admin Actions -->
+            <div class="admin-actions">
+                <button class="btn-secondary" onclick="showChallengeSettings()">
+                    <span>⚙️</span> Challenge Settings
+                </button>
+                <button class="btn-secondary" onclick="showSpreadsheetView()">
+                    <span>📋</span> Spreadsheet View
+                </button>
+            </div>
+            <div class="admin-actions">
+                <button class="btn-secondary" onclick="showImport()">
+                    <span>📤</span> Bulk Import
+                </button>
+                <button class="btn-secondary" onclick="exportToCSV()">
+                    <span>📥</span> Export CSV
+                </button>
+                <button class="btn-secondary" onclick="downloadFullBackup()">
+                    <span>💾</span> Full Backup
+                </button>
+            </div>
+
+            <!-- Restore Backup -->
+            <div class="admin-actions">
+                <label class="btn-secondary" style="cursor: pointer;">
+                    <span>📂</span> Restore Backup
+                    <input type="file" id="restore-backup-input" accept=".json" style="display: none;">
+                </label>
+            </div>
+
+            <!-- Participants List -->
+            <div class="admin-section">
+                <h3>All Participants</h3>
+                <div id="admin-participants-list">
+                    <!-- Dynamically rendered -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Screen -->
+    <div id="settings-screen" class="screen">
+        <div class="container">
+            <div class="screen-header">
+                <button class="back-btn" id="back-from-settings">←</button>
+                <h2>⚙️ Settings</h2>
+                <div class="spacer"></div>
+            </div>
+
+            <div class="settings-section">
+                <h3>Your Profile
+                    <span id="admin-badge" class="admin-badge" style="display:none;">Admin</span>
+                    <span id="super-admin-badge" class="super-admin-badge" style="display:none;">👑 Super Admin</span>
+                </h3>
+                <div class="settings-item">
+                    <label>Name</label>
+                    <input type="text" id="settings-name" class="settings-input">
+                </div>
+                <div class="settings-item">
+                    <label>Phone</label>
+                    <input type="tel" id="settings-phone" class="settings-input" disabled>
+                </div>
+                <div class="settings-item">
+                    <label>Your Goal</label>
+                    <input type="text" id="settings-goal" class="settings-input" placeholder="What's your goal?">
+                </div>
+                <div class="settings-item">
+                    <label>Daily Commitment</label>
+                    <input type="text" id="settings-commitment" class="settings-input" placeholder="Your daily commitment">
+                </div>
+                <button class="btn-primary" id="save-settings-btn">Save Changes</button>
+            </div>
+
+            <div class="settings-section">
+                <h3>Reminders</h3>
+                <p class="settings-desc">Enable reminders for unlogged days</p>
+                <button class="btn-secondary" onclick="enableReminders()">
+                    <span>🔔</span> Enable Reminders
+                </button>
+            </div>
+
+            <div class="settings-section">
+                <h3>Challenge Info</h3>
+                <div class="info-item">
+                    <span>Season</span>
+                    <span id="info-season">Season 6</span>
+                </div>
+                <div class="info-item">
+                    <span>End Date</span>
+                    <span id="info-end-date">May 11, 2026</span>
+                </div>
+                <div class="info-item">
+                    <span>Total Participants</span>
+                    <span id="info-participants">0</span>
+                </div>
+            </div>
+
+            <div class="settings-section danger-zone">
+                <h3>Account</h3>
+                <button class="btn-secondary" id="logout-btn">
+                    <span>🚪</span> Logout
+                </button>
+                <button class="btn-danger" id="clear-data-btn" style="margin-top: 10px; background: #dc3545;">
+                    <span>🗑️</span> Clear All Local Data
+                </button>
+                <p style="font-size: 12px; color: #888; margin-top: 5px;">Use this if you see old/test data</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div id="import-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Import Participants</h3>
+                <button class="modal-close" onclick="closeModal('import-modal')">×</button>
+            </div>
+            <div class="modal-body">
+                <p>Paste your participant list below (one per line)</p>
+                <p class="import-format">Format: Name, Phone, Goal (optional), Commitment (optional)</p>
+                <textarea id="import-data" rows="10" placeholder="John Doe, 9876543210, Get fit, 1 hour daily&#10;Jane Smith, 9876543211, Lose weight, 30 mins"></textarea>
+                <div class="form-group" style="margin-top: 12px;">
+                    <label>Default Password for all</label>
+                    <input type="text" id="import-default-password" placeholder="1234" value="1234">
+                    <span class="input-hint">Users can change their password later</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal('import-modal')">Cancel</button>
+                <button class="btn-primary" onclick="importParticipants()">Import</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Checkin Modal (Admin) -->
+    <div id="edit-checkin-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Check-ins</h3>
+                <button class="modal-close" onclick="closeModal('edit-checkin-modal')">×</button>
+            </div>
+            <div class="modal-body">
+                <p class="edit-participant-name">Editing: <strong id="edit-checkin-participant-name"></strong></p>
+                <div id="edit-checkin-dates">
+                    <!-- Dynamically rendered -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary" onclick="closeModal('edit-checkin-modal')">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Log Modal (from Calendar) -->
+    <div id="quick-log-modal" class="modal">
+        <div class="modal-content small">
+            <div class="modal-header">
+                <h3 class="modal-title">Log Workout</h3>
+                <button class="modal-close" onclick="closeModal('quick-log-modal')">×</button>
+            </div>
+            <div class="modal-body centered">
+                <p>Did you workout on <strong id="quick-log-date" data-date="" data-status=""></strong>?</p>
+                <div class="quick-log-buttons">
+                    <button class="quick-log-btn checkin-btn yes" data-status="Y" onclick="quickLogSubmit('Y')">
+                        <span class="btn-icon">💪</span>
+                        <span class="btn-text">Workout</span>
+                    </button>
+                    <button class="quick-log-btn checkin-btn rest" data-status="R" onclick="quickLogSubmit('R')">
+                        <span class="btn-icon">🧘</span>
+                        <span class="btn-text">Rest</span>
+                    </button>
+                    <button class="quick-log-btn checkin-btn no" data-status="N" onclick="quickLogSubmit('N')">
+                        <span class="btn-icon">😴</span>
+                        <span class="btn-text">Skipped</span>
+                    </button>
+                </div>
+                <button id="quick-log-delete" class="btn-text btn-delete" onclick="quickLogDelete()" style="display: none;">
+                    🗑️ Delete entry
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reminder Modal -->
+    <div id="reminder-modal" class="modal">
+        <div class="modal-content small">
+            <div class="modal-header">
+                <h3>📅 Workout Reminder</h3>
+                <button class="modal-close" onclick="handleReminderAction('ignore')">×</button>
+            </div>
+            <div class="modal-body centered">
+                <div class="reminder-icon">🏋️</div>
+                <p>You haven't logged workouts for <strong id="reminder-date-text"></strong>!</p>
+                <p class="reminder-count"><span id="reminder-count">0</span> day(s) unlogged</p>
+                <div class="reminder-actions">
+                    <button class="btn-primary" onclick="handleReminderAction('log')">Log Now</button>
+                    <button class="btn-secondary" onclick="handleReminderAction('later')">Remind Later</button>
+                    <button class="btn-text" onclick="handleReminderAction('ignore')">Ignore for today</button>
+                    <button class="btn-text small" onclick="handleReminderAction('never')">Don't remind me</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Challenge Settings Modal (Super Admin) -->
+    <div id="challenge-settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>⚙️ Challenge Settings</h3>
+                <button class="modal-close" onclick="closeModal('challenge-settings-modal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Season Name</label>
+                    <input type="text" id="settings-season-name" placeholder="Season 6">
+                </div>
+                <div class="form-group">
+                    <label>Start Date</label>
+                    <input type="date" id="settings-start-date">
+                </div>
+                <div class="form-group">
+                    <label>End Date</label>
+                    <input type="date" id="settings-end-date">
+                </div>
+                <div class="form-group">
+                    <label>Total Days</label>
+                    <input type="number" id="settings-total-days" min="1" max="365">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal('challenge-settings-modal')">Cancel</button>
+                <button class="btn-primary" onclick="saveChallengeSettings()">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Spreadsheet View Modal -->
+    <div id="spreadsheet-modal" class="modal fullscreen">
+        <div class="modal-content fullscreen">
+            <div class="modal-header">
+                <h3>📋 Spreadsheet View</h3>
+                <button class="modal-close" onclick="closeModal('spreadsheet-modal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div id="spreadsheet-content">
+                    <!-- Dynamically rendered -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="exportToCSV()">📥 Export CSV</button>
+                <button class="btn-primary" onclick="closeModal('spreadsheet-modal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Celebration Overlay -->
+    <div id="celebration-overlay" class="celebration-overlay">
+        <div class="celebration-content">
+            <div class="celebration-emoji" id="celebration-emoji">🎉</div>
+            <h2 id="celebration-title">Awesome!</h2>
+            <p id="celebration-message">You crushed it today!</p>
+        </div>
+    </div>
+
+    <!-- Hamburger Menu Button -->
+    <button class="hamburger-btn" id="hamburger-btn" onclick="toggleSidebar()">
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
+    </button>
+
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">💪</div>
+            <h3>100 Days</h3>
+            <button class="sidebar-close" onclick="closeSidebar()">×</button>
+        </div>
+        <div class="sidebar-menu">
+            <a href="#" class="sidebar-item active" data-tab="home" onclick="sidebarNav(event, 'home')">
+                <span class="sidebar-icon">🏠</span>
+                <span class="sidebar-text">Home</span>
+            </a>
+            <a href="#" class="sidebar-item" data-tab="leaderboard" onclick="sidebarNav(event, 'leaderboard')">
+                <span class="sidebar-icon">🏆</span>
+                <span class="sidebar-text">Leaderboard</span>
+            </a>
+            <a href="#" class="sidebar-item" data-tab="participants" onclick="sidebarNav(event, 'participants')">
+                <span class="sidebar-icon">👥</span>
+                <span class="sidebar-text">All Participants</span>
+            </a>
+            <a href="#" class="sidebar-item" data-tab="calendar" onclick="sidebarNav(event, 'calendar')">
+                <span class="sidebar-icon">📅</span>
+                <span class="sidebar-text">Calendar</span>
+            </a>
+            <a href="#" class="sidebar-item" data-tab="summary" onclick="sidebarNav(event, 'summary')">
+                <span class="sidebar-icon">📊</span>
+                <span class="sidebar-text">Share Progress</span>
+            </a>
+            <a href="#" class="sidebar-item" data-tab="admin" id="sidebar-admin-item" style="display: none;" onclick="sidebarNav(event, 'admin')">
+                <span class="sidebar-icon">👑</span>
+                <span class="sidebar-text">Admin Dashboard</span>
+            </a>
+        </div>
+        <div class="sidebar-footer">
+            <a href="#" class="sidebar-item" onclick="sidebarNav(event, 'settings')">
+                <span class="sidebar-icon">⚙️</span>
+                <span class="sidebar-text">Settings</span>
+            </a>
+        </div>
+    </nav>
+
+    <!-- Loading Overlay -->
+    <div id="loading" class="loading-overlay">
+        <div class="loader"></div>
+        <p>Loading...</p>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
