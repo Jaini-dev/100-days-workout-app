@@ -244,57 +244,91 @@
             return streak;
         }
 
-        // Generate weekly summary
-        function generateWeeklySummary() {
-            const sorted = [...participants].sort((a, b) => {
-                const aWorkouts = calculateTotalWorkouts(a);
-                const bWorkouts = calculateTotalWorkouts(b);
-                if (bWorkouts !== aWorkouts) return bWorkouts - aWorkouts;
-                return calculateStreak(b) - calculateStreak(a);
-            });
+        // Get week end date (Sunday)
+        function getWeekEnd() {
+            const weekStart = getWeekStart();
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekEnd.getDate() + 6);
+            return weekEnd;
+        }
 
+        // Generate weekly summary - compact format with tied rankings
+        function generateWeeklySummary() {
             // Calculate stats for each participant
-            sorted.forEach(p => {
+            participants.forEach(p => {
                 p.totalWorkouts = calculateTotalWorkouts(p);
                 p.weeklyWorkouts = calculateWeeklyWorkouts(p);
                 p.streak = calculateStreak(p);
             });
 
             const weekStart = getWeekStart();
+            const weekEnd = getWeekEnd();
             const currentDay = getCurrentDay();
 
-            // Sort by weekly workouts for this summary
-            const sortedByWeek = [...sorted].sort((a, b) => b.weeklyWorkouts - a.weeklyWorkouts);
-            const totalWeekWorkouts = sortedByWeek.reduce((sum, p) => sum + p.weeklyWorkouts, 0);
-
-            let text = `*📊 100 Days of Workout - Weekly Update*\n`;
-            text += `📅 Week of ${formatShortDate(weekStart)}\n`;
-            text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
-            text += `💪 *Total Workouts:* ${totalWeekWorkouts}\n`;
-            text += `👥 *Participants:* ${sorted.length}\n\n`;
-
-            text += `*🏆 Top Performers This Week:*\n`;
-            const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
-            sortedByWeek.slice(0, 5).forEach((p, i) => {
-                const weekCount = p.weeklyWorkouts;
-                text += `${medals[i]} *${p.name}:* ${weekCount} workout${weekCount !== 1 ? 's' : ''} | Total: ${p.totalWorkouts} days\n`;
+            // Group participants by weekly workout count
+            const groupedByCount = {};
+            participants.forEach(p => {
+                const count = p.weeklyWorkouts;
+                if (!groupedByCount[count]) groupedByCount[count] = [];
+                groupedByCount[count].push(p.name);
             });
 
-            // Show improvement highlights
-            const comebackStars = sortedByWeek.filter(p => {
-                const weekRate = p.weeklyWorkouts / 7;
-                const overallRate = currentDay > 0 ? p.totalWorkouts / currentDay : 0;
-                return weekRate > overallRate + 0.1;
-            }).slice(0, 3);
+            // Sort counts descending (7, 6, 5, 4, 3, 2, 1, 0)
+            const sortedCounts = Object.keys(groupedByCount)
+                .map(Number)
+                .sort((a, b) => b - a);
 
-            if (comebackStars.length > 0) {
-                text += `\n*🌟 Comeback Stars:*\n`;
-                comebackStars.forEach(p => {
-                    text += `• ${p.name} 📈\n`;
-                });
+            // Calculate total workouts and active participants
+            const totalWeekWorkouts = participants.reduce((sum, p) => sum + p.weeklyWorkouts, 0);
+            const activeCount = participants.filter(p => p.weeklyWorkouts > 0).length;
+
+            // Find streak leader
+            const streakLeader = [...participants].sort((a, b) => b.streak - a.streak)[0];
+
+            // Build the message
+            let text = `*📊 100 Days of Workout - Weekly Update*\n`;
+            text += `📅 ${formatShortDate(weekStart)} - ${formatShortDate(weekEnd)} | Day ${currentDay}/100\n`;
+            text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+            text += `💪 ${totalWeekWorkouts} workouts this week | ${activeCount} active\n\n`;
+
+            text += `*🏆 This Week's Rankings:*\n`;
+
+            // Generate rankings with tied ranks
+            let rank = 1;
+            sortedCounts.forEach((count, index) => {
+                if (count === 0) return; // Skip people with 0 workouts
+
+                const names = groupedByCount[count];
+                const displayRank = rank;
+
+                // For top 4 ranks or if 3 or fewer people, show names
+                // Otherwise show "+N others"
+                if (displayRank <= 4 || names.length <= 3) {
+                    if (names.length <= 4) {
+                        text += `#${displayRank} (${count}) ${names.join(', ')}\n`;
+                    } else {
+                        // Show first 3 names + others
+                        text += `#${displayRank} (${count}) ${names.slice(0, 3).join(', ')} +${names.length - 3} more\n`;
+                    }
+                } else {
+                    text += `#${displayRank} (${count}) +${names.length} others\n`;
+                }
+
+                rank++; // Dense ranking - each unique score gets next rank
+            });
+
+            // Show who didn't workout (0 count) if any
+            if (groupedByCount[0] && groupedByCount[0].length > 0) {
+                const zeroCount = groupedByCount[0].length;
+                text += `⏸️ (0) ${zeroCount} resting\n`;
             }
 
-            text += `\n#100DaysOfWorkout #WeeklyUpdate`;
+            // Streak leader highlight
+            if (streakLeader && streakLeader.streak > 0) {
+                text += `\n🔥 *Longest Streak:* ${streakLeader.name} (${streakLeader.streak} days)\n`;
+            }
+
+            text += `\n#100DaysOfWorkout`;
 
             return text;
         }
