@@ -191,12 +191,23 @@ function getTodayString() {
 // Get current date in user's timezone
 function getUserLocalDate() {
     const timezone = getUserTimezone();
+    return getDateInTimezone(timezone);
+}
+
+// Get current date in a specific timezone
+function getDateInTimezone(timezone) {
     const now = new Date();
-    // Create a date string in the user's timezone
     const options = { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' };
     const dateStr = now.toLocaleDateString('en-CA', options); // en-CA gives YYYY-MM-DD format
     const [year, month, day] = dateStr.split('-').map(Number);
     return new Date(year, month - 1, day);
+}
+
+// Get today's date string for a specific participant (using their timezone)
+function getTodayForParticipant(participant) {
+    const timezone = participant?.timezone || 'Asia/Kolkata';
+    const today = getDateInTimezone(timezone);
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 }
 
 // Get user's timezone from settings or default to India
@@ -205,6 +216,18 @@ function getUserTimezone() {
         return appState.currentUser.timezone;
     }
     return 'Asia/Kolkata'; // Default to India
+}
+
+// Get week start for a specific participant (using their timezone)
+function getWeekStartForParticipant(participant) {
+    const timezone = participant?.timezone || 'Asia/Kolkata';
+    const today = getDateInTimezone(timezone);
+    const dayOfWeek = today.getDay();
+    const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+    const monday = new Date(today);
+    monday.setDate(diff);
+    monday.setHours(0, 0, 0, 0);
+    return monday;
 }
 
 function getDateString(date) {
@@ -1622,7 +1645,9 @@ function calculateStreak(user) {
     if (!user.checkins) return 0;
 
     let streak = 0;
-    const today = new Date();
+    // Use the participant's timezone for calculating their streak
+    const timezone = user?.timezone || 'Asia/Kolkata';
+    const today = getDateInTimezone(timezone);
     today.setHours(0, 0, 0, 0);
 
     for (let i = 0; i < 365; i++) {
@@ -1657,7 +1682,8 @@ function calculateTotalWorkouts(user) {
 
 function calculateWeeklyWorkouts(user) {
     if (!user.checkins) return 0;
-    const weekStart = getWeekStart();
+    // Use the participant's timezone for calculating their weekly workouts
+    const weekStart = getWeekStartForParticipant(user);
     let count = 0;
 
     for (let i = 0; i < 7; i++) {
@@ -2348,12 +2374,14 @@ function viewParticipantCalendar(phone) {
     openModal('participant-calendar-modal');
 }
 
-// Helper function to calculate streak for any participant
+// Helper function to calculate streak for any participant (uses their timezone)
 function calculateStreakForParticipant(participant) {
     if (!participant.checkins) return 0;
 
     let streak = 0;
-    const today = new Date();
+    // Use participant's timezone
+    const timezone = participant?.timezone || 'Asia/Kolkata';
+    const today = getDateInTimezone(timezone);
     today.setHours(0, 0, 0, 0);
 
     for (let i = 0; i < 365; i++) {
@@ -2376,10 +2404,11 @@ function calculateStreakForParticipant(participant) {
     return streak;
 }
 
-// Helper function to calculate weekly workouts for any participant
+// Helper function to calculate weekly workouts for any participant (uses their timezone)
 function calculateWeeklyWorkoutsForParticipant(participant) {
     if (!participant.checkins) return 0;
-    const weekStart = getWeekStart();
+    // Use participant's timezone
+    const weekStart = getWeekStartForParticipant(participant);
     let count = 0;
 
     for (let i = 0; i < 7; i++) {
@@ -2397,8 +2426,11 @@ function calculateWeeklyWorkoutsForParticipant(participant) {
 function renderParticipantCalendarView(participant) {
     const startDate = new Date(challengeSettings.startDate);
     startDate.setHours(0, 0, 0, 0);
-    const today = new Date();
+    // Use participant's timezone for "today"
+    const timezone = participant?.timezone || 'Asia/Kolkata';
+    const today = getDateInTimezone(timezone);
     today.setHours(0, 0, 0, 0);
+    const todayStr = getTodayForParticipant(participant);
 
     const months = ['January', 'February', 'March', 'April', 'May', 'June',
                     'July', 'August', 'September', 'October', 'November', 'December'];
@@ -2445,7 +2477,7 @@ function renderParticipantCalendarView(participant) {
             const dateStr = getDateString(date);
             const checkin = participant.checkins ? participant.checkins[dateStr] : null;
             const isPast = date < today;
-            const isToday = dateStr === getTodayString();
+            const isToday = dateStr === todayStr; // Use participant's timezone
 
             let statusClass = '';
             if (checkin === 'Y') {
