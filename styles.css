@@ -1756,6 +1756,13 @@ body {
     margin-bottom: 16px;
 }
 
+.settings-item-timezone {
+    margin-top: 24px;
+    margin-bottom: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--gray-100);
+}
+
 .settings-item label {
     display: block;
     font-size: 14px;

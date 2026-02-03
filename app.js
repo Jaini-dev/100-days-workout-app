@@ -3416,6 +3416,11 @@ function showSpreadsheetView() {
 // ============================================
 // MODAL FUNCTIONS
 // ============================================
+function openModal(modalId) {
+    const modal = $(modalId);
+    if (modal) modal.classList.add('active');
+}
+
 function closeModal(modalId) {
     const modal = $(modalId);
     if (modal) modal.classList.remove('active');
