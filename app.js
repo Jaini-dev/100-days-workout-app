@@ -249,34 +249,55 @@ function hashPassword(password) {
 }
 
 // Best streak ever (for personal progress)
+// Rest days ('R') don't break streaks, but don't count towards them either
 function calculateBestStreak(user) {
     if (!user.checkins) return 0;
 
     const entries = Object.entries(user.checkins).sort((a, b) => a[0].localeCompare(b[0]));
     let bestStreak = 0;
     let currentStreak = 0;
-    let lastDate = null;
+    let lastYesDate = null; // Track last 'Y' date for streak calculation
 
     for (const [dateStr, status] of entries) {
         if (status === 'Y') {
-            if (lastDate) {
-                const prevDate = new Date(lastDate);
+            if (lastYesDate) {
+                const prevDate = new Date(lastYesDate);
                 const currDate = new Date(dateStr);
-                const diff = Math.floor((currDate - prevDate) / (1000 * 60 * 60 * 24));
-                if (diff === 1) {
+                const daysDiff = Math.floor((currDate - prevDate) / (1000 * 60 * 60 * 24));
+
+                // Check if all days between lastYesDate and current are either 'Y' or 'R'
+                let streakBroken = false;
+                for (let d = 1; d < daysDiff; d++) {
+                    const checkDate = new Date(prevDate);
+                    checkDate.setDate(checkDate.getDate() + d);
+                    const checkDateStr = checkDate.toISOString().split('T')[0];
+                    const checkStatus = user.checkins[checkDateStr];
+                    // If any day in between is 'N' or missing, streak is broken
+                    if (checkStatus !== 'R' && checkStatus !== 'Y') {
+                        streakBroken = true;
+                        break;
+                    }
+                }
+
+                if (!streakBroken && daysDiff >= 1) {
                     currentStreak++;
+                } else if (streakBroken) {
+                    currentStreak = 1;
                 } else {
+                    // Same day or invalid
                     currentStreak = 1;
                 }
             } else {
                 currentStreak = 1;
             }
             bestStreak = Math.max(bestStreak, currentStreak);
-            lastDate = dateStr;
-        } else {
+            lastYesDate = dateStr;
+        } else if (status === 'N') {
+            // Only 'N' (explicit skip) breaks the streak
             currentStreak = 0;
-            lastDate = null;
+            lastYesDate = null;
         }
+        // 'R' (rest) does nothing - doesn't break or contribute
     }
 
     return bestStreak;
@@ -1452,7 +1473,7 @@ function updateDashboard() {
     const remainEl = $('days-remaining');
     if (remainEl) remainEl.textContent = daysLeft;
 
-    // Calculate rank with tied rank support
+    // Calculate rank with tied rank support (using totalWorkouts)
     const sorted = getSortedParticipants('all');
     const userPhone = (user.phone || '').toString().replace(/\D/g, '').slice(-10);
     const userIndex = sorted.findIndex(p => {
@@ -1460,17 +1481,16 @@ function updateDashboard() {
         return pPhone === userPhone;
     });
 
-    // Debug: log top participants and their scores
-    console.log('Top 5 sorted:', sorted.slice(0, 5).map((p, i) => ({
-        index: i,
-        name: p.name,
-        totalWorkouts: p.totalWorkouts,
-        streak: p.streak
-    })));
-    console.log('User index:', userIndex, 'User phone:', userPhone);
-
-    const rank = userIndex >= 0 ? getTiedRank(sorted, userIndex, 'all') : 0;
-    console.log('Calculated rank:', rank);
+    // Find the rank by counting how many people have MORE workouts than the user
+    let rank = 1;
+    if (userIndex >= 0) {
+        const userWorkouts = sorted[userIndex].totalWorkouts || 0;
+        for (let i = 0; i < sorted.length; i++) {
+            if ((sorted[i].totalWorkouts || 0) > userWorkouts) {
+                rank++;
+            }
+        }
+    }
     const rankCard = $('rank-card');
     const rankEl = $('your-rank');
     const rankLabel = rankCard ? rankCard.querySelector('.stat-label') : null;
@@ -1735,21 +1755,26 @@ async function undoCheckin() {
     // Remove from local state
     delete appState.currentUser.checkins[today];
 
-    // Sync with cloud - submit empty/null status to delete
+    // Sync with cloud - delete from Google Sheets
     if (CONFIG.USE_CLOUD_SYNC) {
         try {
             const response = await fetch(CONFIG.API_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                mode: 'cors',
+                headers: { 'Content-Type': 'text/plain' },
                 body: JSON.stringify({
                     action: 'deleteCheckin',
                     phone: appState.currentUser.phone,
                     date: today
                 })
             });
-            // Even if cloud sync fails, we've updated locally
+            const result = await response.json();
+            console.log('Delete checkin result:', result);
+            if (!result.success) {
+                console.error('Failed to delete from cloud:', result.error);
+            }
         } catch (error) {
-            console.log('Cloud sync failed for undo, keeping local change');
+            console.error('Cloud sync failed for undo:', error);
         }
     }
 
@@ -1860,37 +1885,57 @@ function getSortedParticipants(category = 'thisWeek') {
     });
 }
 
-// Calculate tied rank (same score = same rank)
+// Calculate tied rank (same score = same rank, proper dense ranking)
 function getTiedRank(sorted, index, category) {
     if (index === 0) return 1;
 
     const current = sorted[index];
-    const prev = sorted[index - 1];
+    if (!current) return index + 1;
 
-    if (!current || !prev) return index + 1;
-
-    // Compare based on category
-    let currentScore, prevScore;
+    // Get the score for the current item
+    let currentScore;
     switch (category) {
         case 'thisWeek':
             currentScore = current.weeklyWorkouts || 0;
-            prevScore = prev.weeklyWorkouts || 0;
             break;
         case 'streaks':
             currentScore = current.streak || 0;
-            prevScore = prev.streak || 0;
+            break;
+        case 'comeback':
+            currentScore = current.comebackScore || 0;
             break;
         default:
             currentScore = current.totalWorkouts || 0;
-            prevScore = prev.totalWorkouts || 0;
     }
 
-    // If same score as previous, return same rank
-    if (currentScore === prevScore) {
-        return getTiedRank(sorted, index - 1, category);
+    // Count how many DISTINCT scores are higher than current score
+    let rank = 1;
+    const seenScores = new Set();
+
+    for (let i = 0; i < index; i++) {
+        const p = sorted[i];
+        let score;
+        switch (category) {
+            case 'thisWeek':
+                score = p.weeklyWorkouts || 0;
+                break;
+            case 'streaks':
+                score = p.streak || 0;
+                break;
+            case 'comeback':
+                score = p.comebackScore || 0;
+                break;
+            default:
+                score = p.totalWorkouts || 0;
+        }
+
+        if (score > currentScore && !seenScores.has(score)) {
+            seenScores.add(score);
+            rank++;
+        }
     }
 
-    return index + 1;
+    return rank;
 }
 
 function getCategoryTitle(category) {
@@ -1953,11 +1998,14 @@ function renderLeaderboard(category = 'thisWeek') {
     const podium = $('podium');
     if (podium) podium.innerHTML = '';
 
-    // Full leaderboard Table Format (no limit)
+    // Leaderboard Table Format (initially show 10, expandable)
     const list = $('leaderboard-list');
     if (list) {
-        const allParticipants = displayList; // Show all participants
         const medals = ['🥇', '🥈', '🥉'];
+        const isExpanded = appState.leaderboardExpanded || false;
+        const initialCount = 10;
+        const visibleParticipants = isExpanded ? displayList : displayList.slice(0, initialCount);
+        const hiddenCount = displayList.length - initialCount;
 
         let html = `
             <table class="lb-table">
@@ -1973,7 +2021,7 @@ function renderLeaderboard(category = 'thisWeek') {
                 <tbody>
         `;
 
-        allParticipants.forEach((p, i) => {
+        visibleParticipants.forEach((p, i) => {
             const isMe = appState.currentUser && p.phone === appState.currentUser.phone;
             const rank = getTiedRank(displayList, i, category);
             const rate = currentDay > 0 ? Math.round((p.totalWorkouts / currentDay) * 100) : 0;
@@ -2008,13 +2056,23 @@ function renderLeaderboard(category = 'thisWeek') {
 
         html += '</tbody></table>';
 
-        // Show count if more than 10
-        if (displayList.length > 10) {
-            html += `<div class="lb-more">+ ${displayList.length - 10} more participants</div>`;
+        // Show expand/collapse button if more than 10
+        if (hiddenCount > 0) {
+            if (isExpanded) {
+                html += `<div class="lb-more lb-more-clickable" onclick="toggleLeaderboardExpand()">▲ Show less</div>`;
+            } else {
+                html += `<div class="lb-more lb-more-clickable" onclick="toggleLeaderboardExpand()">+ ${hiddenCount} more participants ▼</div>`;
+            }
         }
 
         list.innerHTML = html || '<p class="empty-message">No participants yet</p>';
     }
+}
+
+// Toggle leaderboard expand/collapse
+function toggleLeaderboardExpand() {
+    appState.leaderboardExpanded = !appState.leaderboardExpanded;
+    renderLeaderboard(appState.leaderboardCategory || 'thisWeek');
 }
 
 // Toggle All Participants view
@@ -2171,6 +2229,8 @@ function renderParticipantsList(participants) {
                 <div class="rank-num ${rankClass}">${rank}</div>
                 <div class="participant-info">
                     <div class="participant-name">${p.name}${isMe ? ' (You)' : ''} ${todayIcon}</div>
+                    ${p.goal ? `<div class="participant-goal">🎯 ${p.goal}</div>` : ''}
+                    ${p.commitment ? `<div class="participant-commit">⏰ ${p.commitment}</div>` : ''}
                     <div class="participant-stats">🔥 ${p.streak} streak · This week: ${p.weeklyWorkouts}</div>
                 </div>
                 <div class="participant-workouts">${p.totalWorkouts}</div>
@@ -2445,17 +2505,23 @@ async function quickLogDelete() {
     // Sync with cloud
     if (CONFIG.USE_CLOUD_SYNC) {
         try {
-            await fetch(CONFIG.API_URL, {
+            const response = await fetch(CONFIG.API_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                mode: 'cors',
+                headers: { 'Content-Type': 'text/plain' },
                 body: JSON.stringify({
                     action: 'deleteCheckin',
                     phone: appState.currentUser.phone,
                     date: dateStr
                 })
             });
+            const result = await response.json();
+            console.log('Delete checkin result:', result);
+            if (!result.success) {
+                console.error('Failed to delete from cloud:', result.error);
+            }
         } catch (error) {
-            console.log('Cloud sync failed for delete');
+            console.error('Cloud sync failed for delete:', error);
         }
     }
 
