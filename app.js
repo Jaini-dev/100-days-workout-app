@@ -184,8 +184,27 @@ function formatShortDate(date) {
 }
 
 function getTodayString() {
-    const today = new Date();
+    const today = getUserLocalDate();
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+}
+
+// Get current date in user's timezone
+function getUserLocalDate() {
+    const timezone = getUserTimezone();
+    const now = new Date();
+    // Create a date string in the user's timezone
+    const options = { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' };
+    const dateStr = now.toLocaleDateString('en-CA', options); // en-CA gives YYYY-MM-DD format
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+}
+
+// Get user's timezone from settings or default to India
+function getUserTimezone() {
+    if (appState.currentUser && appState.currentUser.timezone) {
+        return appState.currentUser.timezone;
+    }
+    return 'Asia/Kolkata'; // Default to India
 }
 
 function getDateString(date) {
@@ -781,6 +800,11 @@ function showSettings() {
         $('settings-phone').value = appState.currentUser.phone;
         $('settings-goal').value = appState.currentUser.goal || '';
         $('settings-commitment').value = appState.currentUser.commitment || '';
+        // Load timezone setting
+        const timezoneSelect = $('settings-timezone');
+        if (timezoneSelect) {
+            timezoneSelect.value = appState.currentUser.timezone || 'Asia/Kolkata';
+        }
     }
     $('info-participants').textContent = appState.participants.length;
 
@@ -2228,7 +2252,7 @@ function renderParticipantsList(participants) {
         const rankClass = rank === 1 ? 'top-1' : rank === 2 ? 'top-2' : rank === 3 ? 'top-3' : '';
 
         html += `
-            <div class="participant-row ${isMe ? 'is-me' : ''}">
+            <div class="participant-row ${isMe ? 'is-me' : ''}" onclick="viewParticipantCalendar('${p.phone}')" style="cursor: pointer;">
                 <div class="rank-num ${rankClass}">${rank}</div>
                 <div class="participant-info">
                     <div class="participant-name">${p.name}${isMe ? ' (You)' : ''} ${todayIcon}</div>
@@ -2262,6 +2286,203 @@ async function refreshParticipants() {
     showToast('Refreshing...', '');
     await refreshFromCloud();
     renderParticipantsScreen();
+}
+
+// View participant's calendar (read-only)
+function viewParticipantCalendar(phone) {
+    const participant = appState.participants.find(p => {
+        const pPhone = (p.phone || '').toString().replace(/\D/g, '').slice(-10);
+        const searchPhone = (phone || '').toString().replace(/\D/g, '').slice(-10);
+        return pPhone === searchPhone;
+    });
+
+    if (!participant) {
+        showToast('Participant not found', 'error');
+        return;
+    }
+
+    // Update modal title
+    const titleEl = $('participant-calendar-title');
+    if (titleEl) {
+        titleEl.textContent = `📅 ${participant.name}'s Calendar`;
+    }
+
+    // Calculate stats
+    const totalWorkouts = participant.checkins ?
+        Object.values(participant.checkins).filter(v => v === 'Y').length : 0;
+    const streak = calculateStreakForParticipant(participant);
+    const weeklyWorkouts = calculateWeeklyWorkoutsForParticipant(participant);
+    const currentDay = getCurrentDay();
+    const rate = currentDay > 0 ? Math.round((totalWorkouts / currentDay) * 100) : 0;
+
+    // Render stats
+    const statsEl = $('participant-calendar-stats');
+    if (statsEl) {
+        statsEl.innerHTML = `
+            <div class="modal-stat">
+                <span class="modal-stat-value">${totalWorkouts}</span>
+                <span class="modal-stat-label">Total Workouts</span>
+            </div>
+            <div class="modal-stat">
+                <span class="modal-stat-value">${streak} 🔥</span>
+                <span class="modal-stat-label">Current Streak</span>
+            </div>
+            <div class="modal-stat">
+                <span class="modal-stat-value">${weeklyWorkouts}</span>
+                <span class="modal-stat-label">This Week</span>
+            </div>
+            <div class="modal-stat">
+                <span class="modal-stat-value">${rate}%</span>
+                <span class="modal-stat-label">Completion</span>
+            </div>
+        `;
+    }
+
+    // Render calendar (read-only)
+    const calendarEl = $('participant-calendar-content');
+    if (calendarEl) {
+        calendarEl.innerHTML = renderParticipantCalendarView(participant);
+    }
+
+    // Show modal
+    openModal('participant-calendar-modal');
+}
+
+// Helper function to calculate streak for any participant
+function calculateStreakForParticipant(participant) {
+    if (!participant.checkins) return 0;
+
+    let streak = 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (let i = 0; i < 365; i++) {
+        const checkDate = new Date(today);
+        checkDate.setDate(checkDate.getDate() - i);
+        const dateStr = getDateString(checkDate);
+        const checkin = participant.checkins[dateStr];
+
+        if (checkin === 'Y') {
+            streak++;
+        } else if (checkin === 'R') {
+            continue;
+        } else if (checkin === 'N') {
+            break;
+        } else if (i > 0) {
+            break;
+        }
+    }
+
+    return streak;
+}
+
+// Helper function to calculate weekly workouts for any participant
+function calculateWeeklyWorkoutsForParticipant(participant) {
+    if (!participant.checkins) return 0;
+    const weekStart = getWeekStart();
+    let count = 0;
+
+    for (let i = 0; i < 7; i++) {
+        const date = new Date(weekStart);
+        date.setDate(date.getDate() + i);
+        const dateStr = getDateString(date);
+        if (participant.checkins[dateStr] === 'Y') {
+            count++;
+        }
+    }
+    return count;
+}
+
+// Render read-only calendar view for a participant
+function renderParticipantCalendarView(participant) {
+    const startDate = new Date(challengeSettings.startDate);
+    startDate.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                    'July', 'August', 'September', 'October', 'November', 'December'];
+    const dayNames = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+    const endDate = new Date(challengeSettings.endDate);
+    const periodDays = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+
+    // Group days by month
+    const monthGroups = {};
+    for (let i = 0; i < periodDays; i++) {
+        const date = new Date(startDate);
+        date.setDate(date.getDate() + i);
+        const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
+        if (!monthGroups[monthKey]) {
+            monthGroups[monthKey] = {
+                month: date.getMonth(),
+                year: date.getFullYear(),
+                days: []
+            };
+        }
+        monthGroups[monthKey].days.push({ dayIndex: i, date: new Date(date) });
+    }
+
+    let html = '';
+
+    Object.values(monthGroups).forEach(monthData => {
+        html += `<div class="calendar-month-header">${months[monthData.month]} ${monthData.year}</div>`;
+        html += '<div class="calendar-grid">';
+
+        dayNames.forEach(d => {
+            html += `<div class="cal-header">${d}</div>`;
+        });
+
+        const firstDayOfMonth = monthData.days[0].date;
+        const dayOfWeek = firstDayOfMonth.getDay();
+        const firstDayOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        for (let i = 0; i < firstDayOffset; i++) {
+            html += '<div class="cal-day empty"></div>';
+        }
+
+        monthData.days.forEach(dayData => {
+            const date = dayData.date;
+            const dateStr = getDateString(date);
+            const checkin = participant.checkins ? participant.checkins[dateStr] : null;
+            const isPast = date < today;
+            const isToday = dateStr === getTodayString();
+
+            let statusClass = '';
+            if (checkin === 'Y') {
+                statusClass = 'yes';
+            } else if (checkin === 'N') {
+                statusClass = 'no';
+            } else if (checkin === 'R') {
+                statusClass = 'rest';
+            } else if (isPast) {
+                statusClass = 'not-logged';
+            } else if (isToday) {
+                statusClass = 'today';
+            } else {
+                statusClass = 'future';
+            }
+
+            html += `
+                <div class="cal-day ${statusClass}" title="Day ${dayData.dayIndex + 1}">
+                    <span class="cal-date">${date.getDate()}</span>
+                </div>
+            `;
+        });
+
+        html += '</div>';
+    });
+
+    // Legend
+    html += `
+        <div class="calendar-legend">
+            <div class="legend-item"><span class="legend-color yes"></span> Workout</div>
+            <div class="legend-item"><span class="legend-color rest"></span> Rest</div>
+            <div class="legend-item"><span class="legend-color no"></span> Skipped</div>
+            <div class="legend-item"><span class="legend-color not-logged"></span> Not Logged</div>
+        </div>
+    `;
+
+    return html;
 }
 
 async function refreshLeaderboard() {
@@ -2306,7 +2527,7 @@ function renderCalendar() {
 
     const months = ['January', 'February', 'March', 'April', 'May', 'June',
                     'July', 'August', 'September', 'October', 'November', 'December'];
-    const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    const dayNames = ['M', 'T', 'W', 'T', 'F', 'S', 'S']; // Week starts Monday
 
     // Calculate total days in challenge period (181 days from Feb 1 to July 31)
     const endDate = new Date(challengeSettings.endDate);
@@ -2341,10 +2562,12 @@ function renderCalendar() {
             html += `<div class="cal-header">${d}</div>`;
         });
 
-        // Calculate first day offset for this month
+        // Calculate first day offset for this month (Monday = 0, Sunday = 6)
         const firstDayOfMonth = monthData.days[0].date;
-        const firstDayOfWeek = firstDayOfMonth.getDay();
-        for (let i = 0; i < firstDayOfWeek; i++) {
+        const dayOfWeek = firstDayOfMonth.getDay();
+        // Convert Sunday=0 to Monday=0 format: Mon=0, Tue=1, ..., Sun=6
+        const firstDayOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        for (let i = 0; i < firstDayOffset; i++) {
             html += '<div class="cal-day empty"></div>';
         }
 
@@ -3209,6 +3432,7 @@ function saveSettings() {
     const name = $('settings-name').value.trim();
     const goal = $('settings-goal').value.trim();
     const commitment = $('settings-commitment').value.trim();
+    const timezone = $('settings-timezone') ? $('settings-timezone').value : 'Asia/Kolkata';
 
     if (!name) {
         showToast('Name cannot be empty', 'error');
@@ -3218,12 +3442,14 @@ function saveSettings() {
     appState.currentUser.name = name;
     appState.currentUser.goal = goal;
     appState.currentUser.commitment = commitment;
+    appState.currentUser.timezone = timezone;
 
     const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
     if (idx >= 0) {
         appState.participants[idx].name = name;
         appState.participants[idx].goal = goal;
         appState.participants[idx].commitment = commitment;
+        appState.participants[idx].timezone = timezone;
     }
 
     saveData();

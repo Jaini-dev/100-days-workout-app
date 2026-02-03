@@ -534,6 +534,21 @@
                     <label>Daily Commitment</label>
                     <input type="text" id="settings-commitment" class="settings-input" placeholder="Your daily commitment">
                 </div>
+                <div class="settings-item">
+                    <label>Your Timezone</label>
+                    <select id="settings-timezone" class="settings-input">
+                        <option value="Asia/Kolkata">India (IST)</option>
+                        <option value="America/New_York">US Eastern (EST/EDT)</option>
+                        <option value="America/Chicago">US Central (CST/CDT)</option>
+                        <option value="America/Denver">US Mountain (MST/MDT)</option>
+                        <option value="America/Los_Angeles">US Pacific (PST/PDT)</option>
+                        <option value="Europe/London">UK (GMT/BST)</option>
+                        <option value="Europe/Paris">Europe Central (CET/CEST)</option>
+                        <option value="Asia/Dubai">Dubai (GST)</option>
+                        <option value="Asia/Singapore">Singapore (SGT)</option>
+                        <option value="Australia/Sydney">Australia Eastern (AEST)</option>
+                    </select>
+                </div>
                 <button class="btn-primary" id="save-settings-btn">Save Changes</button>
             </div>
 
@@ -570,6 +585,20 @@
                     <span>🗑️</span> Clear All Local Data
                 </button>
                 <p style="font-size: 12px; color: #888; margin-top: 5px;">Use this if you see old/test data</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Participant Calendar Modal -->
+    <div id="participant-calendar-modal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3 id="participant-calendar-title">📅 Calendar</h3>
+                <button class="modal-close" onclick="closeModal('participant-calendar-modal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div id="participant-calendar-stats" class="participant-modal-stats"></div>
+                <div id="participant-calendar-content" class="participant-calendar-view"></div>
             </div>
         </div>
     </div>

@@ -1840,6 +1840,68 @@ body {
     animation: slideUp 0.3s ease;
 }
 
+.modal-content.modal-large {
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+/* Participant Calendar Modal */
+.participant-modal-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.modal-stat {
+    text-align: center;
+}
+
+.modal-stat-value {
+    display: block;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.modal-stat-label {
+    font-size: 10px;
+    color: var(--gray-500);
+    text-transform: uppercase;
+}
+
+.participant-calendar-view {
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+.participant-calendar-view .calendar-grid {
+    font-size: 11px;
+}
+
+.participant-calendar-view .cal-day {
+    padding: 4px 2px;
+    min-height: 28px;
+}
+
+.participant-calendar-view .cal-date {
+    font-size: 10px;
+}
+
+.participant-calendar-view .calendar-legend {
+    margin-top: 12px;
+    padding-top: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.participant-calendar-view .legend-item {
+    font-size: 10px;
+}
+
 @keyframes slideUp {
     from {
         transform: translateY(20px);
