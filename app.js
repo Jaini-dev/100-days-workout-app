@@ -1481,15 +1481,18 @@ function updateDashboard() {
         return pPhone === userPhone;
     });
 
-    // Find the rank by counting how many people have MORE workouts than the user
+    // Find the rank by counting DISTINCT scores higher than user's score (dense ranking)
     let rank = 1;
     if (userIndex >= 0) {
         const userWorkouts = sorted[userIndex].totalWorkouts || 0;
+        const higherScores = new Set();
         for (let i = 0; i < sorted.length; i++) {
-            if ((sorted[i].totalWorkouts || 0) > userWorkouts) {
-                rank++;
+            const score = sorted[i].totalWorkouts || 0;
+            if (score > userWorkouts) {
+                higherScores.add(score);
             }
         }
+        rank = higherScores.size + 1;
     }
     const rankCard = $('rank-card');
     const rankEl = $('your-rank');
