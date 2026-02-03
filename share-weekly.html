@@ -301,44 +301,42 @@
 
         // Load data from cloud
         async function loadData() {
-            try {
-                // Try to load from cloud first
-                const response = await fetch(CONFIG.API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: JSON.stringify({ action: 'getAllParticipants' })
-                });
-
-                const result = await response.json();
-
-                if (result.success && result.participants) {
-                    participants = result.participants;
-
-                    // Also get challenge settings if available
-                    if (result.challengeSettings) {
-                        challengeSettings = { ...challengeSettings, ...result.challengeSettings };
-                    }
-
-                    return true;
-                }
-
-                throw new Error('No data from cloud');
-            } catch (cloudError) {
-                console.log('Cloud fetch failed, trying local storage...');
-
-                // Fallback to local storage
-                const stored = localStorage.getItem(CONFIG.STORAGE_KEY);
-                if (stored) {
+            // First try local storage (most reliable if user has logged in before)
+            const stored = localStorage.getItem(CONFIG.STORAGE_KEY);
+            if (stored) {
+                try {
                     const data = JSON.parse(stored);
-                    participants = data.participants || [];
-                    if (data.challengeSettings) {
-                        challengeSettings = { ...challengeSettings, ...data.challengeSettings };
-                    }
-                    return participants.length > 0;
-                }
+                    if (data.participants && data.participants.length > 0) {
+                        participants = data.participants;
+                        if (data.challengeSettings) {
+                            challengeSettings = { ...challengeSettings, ...data.challengeSettings };
+                        }
 
-                return false;
+                        // Try to refresh from cloud using stored user's phone
+                        if (data.currentUser && data.currentUser.phone) {
+                            try {
+                                const response = await fetch(CONFIG.API_URL, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'text/plain' },
+                                    body: JSON.stringify({ action: 'login', phone: data.currentUser.phone })
+                                });
+                                const result = await response.json();
+                                if (result.success && result.data && result.data.participants) {
+                                    participants = result.data.participants;
+                                    console.log('Refreshed data from cloud');
+                                }
+                            } catch (e) {
+                                console.log('Cloud refresh failed, using local data');
+                            }
+                        }
+                        return true;
+                    }
+                } catch (e) {
+                    console.log('Error parsing local storage:', e);
+                }
             }
+
+            return false;
         }
 
         // Show states
@@ -368,7 +366,7 @@
             const loaded = await loadData();
 
             if (!loaded || participants.length === 0) {
-                showError('Could not load participant data. Please open the main app first.');
+                showError('No data found. Please log into the main app first on this device, then come back here.');
                 return;
             }
 
