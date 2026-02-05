@@ -1,0 +1,13 @@
+# Old deploy folder (no longer needed - Cloudflare deploys from root)
+deploy/
+
+# Claude settings
+.claude/
+
+# Local docs (contain setup-specific details)
+SETUP-GUIDE.md
+USER-GUIDE.md
+
+# OS files
+.DS_Store
+Thumbs.db

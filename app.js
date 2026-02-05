@@ -11,7 +11,7 @@ const CONFIG = {
     SEASON: 'Season 6',
     STORAGE_KEY: 'workout100_data_v5',
     VERSION: '5.0.0',
-    SUPER_ADMIN_CODE: 'jaey',
+    SUPER_ADMIN_CODE_HASH: '31a82b', // Hashed admin code - not stored in plaintext
     MAX_PAST_DAYS: 7,
     AUTO_BACKUP_INTERVAL: 24 * 60 * 60 * 1000, // 24 hours
     REMINDER_SNOOZE_HOURS: 4,
@@ -165,6 +165,23 @@ let appState = {
 // ============================================
 function $(id) {
     return document.getElementById(id);
+}
+
+// Get a unique identifier for a participant (id preferred, phone as fallback)
+function getParticipantKey(p) {
+    if (p.id) return 'id_' + p.id;
+    if (p.phone) return 'ph_' + (p.phone || '').toString().replace(/\D/g, '').slice(-10);
+    return 'name_' + p.name;
+}
+
+// Check if a participant is the current user
+function isCurrentUser(p) {
+    if (!appState.currentUser) return false;
+    // Match by id first, then by phone
+    if (p.id && appState.currentUser.id && p.id.toString() === appState.currentUser.id.toString()) return true;
+    const pPhone = (p.phone || '').toString().replace(/\D/g, '').slice(-10);
+    const userPhone = (appState.currentUser.phone || '').toString().replace(/\D/g, '').slice(-10);
+    return pPhone && userPhone && pPhone === userPhone;
 }
 
 function getRandomQuote(category) {
@@ -1346,7 +1363,7 @@ function handleAdminLogin() {
         return;
     }
 
-    if (code !== CONFIG.SUPER_ADMIN_CODE) {
+    if (hashPassword(code) !== CONFIG.SUPER_ADMIN_CODE_HASH) {
         showToast('Invalid admin code', 'error');
         return;
     }
@@ -1522,11 +1539,7 @@ function updateDashboard() {
 
     // Calculate rank with tied rank support (using totalWorkouts)
     const sorted = getSortedParticipants('all');
-    const userPhone = (user.phone || '').toString().replace(/\D/g, '').slice(-10);
-    const userIndex = sorted.findIndex(p => {
-        const pPhone = (p.phone || '').toString().replace(/\D/g, '').slice(-10);
-        return pPhone === userPhone;
-    });
+    const userIndex = sorted.findIndex(p => isCurrentUser(p));
 
     // Find the rank by counting DISTINCT scores higher than user's score (dense ranking)
     let rank = 1;
@@ -2075,7 +2088,7 @@ function renderLeaderboard(category = 'thisWeek') {
         `;
 
         visibleParticipants.forEach((p, i) => {
-            const isMe = appState.currentUser && p.phone === appState.currentUser.phone;
+            const isMe = isCurrentUser(p);
             const rank = getTiedRank(displayList, i, category);
             const rate = currentDay > 0 ? Math.round((p.totalWorkouts / currentDay) * 100) : 0;
 
@@ -2162,7 +2175,7 @@ function renderAllParticipants() {
 
     let html = '';
     sorted.forEach((p, index) => {
-        const isMe = appState.currentUser && p.phone === appState.currentUser.phone;
+        const isMe = isCurrentUser(p);
         const rank = getTiedRank(sorted, index, 'all');
         const rate = currentDay > 0 ? Math.round((p.totalWorkouts / currentDay) * 100) : 0;
         const todayStatus = p.checkins ? p.checkins[todayDate] : null;
@@ -2220,7 +2233,7 @@ function renderMiniLeaderboard() {
 
     let html = '';
     sorted.forEach((p, i) => {
-        const isMe = appState.currentUser && p.phone === appState.currentUser.phone;
+        const isMe = isCurrentUser(p);
         html += `
             <div class="mini-lb-item ${isMe ? 'is-me' : ''}">
                 <span class="mini-lb-medal">${medals[i]}</span>
@@ -2267,9 +2280,10 @@ function renderParticipantsList(participants) {
 
     let html = '';
     participants.forEach((p, index) => {
-        const isMe = appState.currentUser && p.phone === appState.currentUser.phone;
+        const isMe = isCurrentUser(p);
         const sorted = window.allParticipantsData || participants;
-        const sortedIndex = sorted.findIndex(sp => sp.phone === p.phone);
+        const pKey = getParticipantKey(p);
+        const sortedIndex = sorted.findIndex(sp => getParticipantKey(sp) === pKey);
         const rank = getTiedRank(sorted, sortedIndex >= 0 ? sortedIndex : index, 'all');
 
         const todayStatus = p.checkins ? p.checkins[todayDate] : null;
@@ -2278,7 +2292,7 @@ function renderParticipantsList(participants) {
         const rankClass = rank === 1 ? 'top-1' : rank === 2 ? 'top-2' : rank === 3 ? 'top-3' : '';
 
         html += `
-            <div class="participant-row ${isMe ? 'is-me' : ''}" onclick="viewParticipantCalendar('${p.phone}')" style="cursor: pointer;">
+            <div class="participant-row ${isMe ? 'is-me' : ''}" onclick="viewParticipantCalendar('${p.id || p.phone}')" style="cursor: pointer;">
                 <div class="rank-num ${rankClass}">${rank}</div>
                 <div class="participant-info">
                     <div class="participant-name">${p.name}${isMe ? ' (You)' : ''} ${todayIcon}</div>
@@ -2315,11 +2329,15 @@ async function refreshParticipants() {
 }
 
 // View participant's calendar (read-only)
-async function viewParticipantCalendar(phone) {
+// identifier can be participant id or phone number
+async function viewParticipantCalendar(identifier) {
     const participant = appState.participants.find(p => {
+        // Match by id first
+        if (p.id && p.id.toString() === identifier.toString()) return true;
+        // Fallback to phone match
         const pPhone = (p.phone || '').toString().replace(/\D/g, '').slice(-10);
-        const searchPhone = (phone || '').toString().replace(/\D/g, '').slice(-10);
-        return pPhone === searchPhone;
+        const searchPhone = (identifier || '').toString().replace(/\D/g, '').slice(-10);
+        return pPhone.length >= 10 && pPhone === searchPhone;
     });
 
     if (!participant) {
@@ -2341,15 +2359,14 @@ async function viewParticipantCalendar(phone) {
     openModal('participant-calendar-modal');
 
     // Load checkins on-demand if not available (API no longer sends checkins for other users)
-    const isCurrentUser = appState.currentUser &&
-        (appState.currentUser.phone || '').toString().replace(/\D/g, '').slice(-10) ===
-        (phone || '').toString().replace(/\D/g, '').slice(-10);
+    const isMe = isCurrentUser(participant);
 
-    if (!participant.checkins && !isCurrentUser && CONFIG.USE_CLOUD_SYNC) {
+    if (!participant.checkins && !isMe && CONFIG.USE_CLOUD_SYNC) {
         try {
             const result = await apiCall('getParticipantCheckins', {
                 phone: appState.currentUser.phone,
-                targetPhone: phone
+                targetId: participant.id || '',
+                targetPhone: participant.phone || ''
             });
             if (result.success && result.data) {
                 participant.checkins = result.data.checkins;

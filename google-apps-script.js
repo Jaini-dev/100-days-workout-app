@@ -14,7 +14,7 @@
 
 // Configuration - UPDATE THIS!
 var CONFIG = {
-  SPREADSHEET_ID: '1ISnA_fUAMaSDctw6BkRs_vWN0biW4oNvMEm_0QHne1M', // Get this from the sheet URL
+  SPREADSHEET_ID: 'YOUR_SPREADSHEET_ID_HERE', // Get this from the sheet URL
   PARTICIPANTS_SHEET: 'Participants',
   CHECKINS_SHEET: 'Checkins',
   START_DATE: '2026-02-01',  // Challenge starts Feb 1
@@ -70,7 +70,7 @@ function handleRequest(e) {
         result = handleGetWeeklySummary();
         break;
       case 'getParticipantCheckins':
-        result = handleGetParticipantCheckins(data.phone, data.targetPhone);
+        result = handleGetParticipantCheckins(data.phone, data.targetPhone, data.targetId);
         break;
       default:
         result = { success: false, error: 'Unknown action: ' + action };
@@ -206,11 +206,11 @@ function handleLogin(phone) {
         streak: sp.streak
       });
     } else {
-      // Regular users get masked phone + computed stats only
+      // Regular users: NO phone number, use id for lookups instead
       safeParticipants.push({
         id: sp.id,
         name: sp.name,
-        phone: sp.phone.slice(0, 2) + '****' + sp.phone.slice(-2),  // Mask: 98****10
+        phone: '',  // Hidden for non-admin users
         goal: sp.goal,
         commitment: sp.commitment,
         joinDate: sp.joinDate,
@@ -370,21 +370,32 @@ function handleGetSummary() {
 }
 
 // Handle get participant checkins on-demand (for calendar view)
-function handleGetParticipantCheckins(requestorPhone, targetPhone) {
-  if (!requestorPhone || !targetPhone) {
+// Accepts either targetPhone or targetId to find participant
+function handleGetParticipantCheckins(requestorPhone, targetPhone, targetId) {
+  if (!requestorPhone) {
     return { success: false, error: 'Missing required fields' };
   }
 
-  var cleanTarget = targetPhone.toString().replace(/\D/g, '').slice(-10);
   var allCheckins = getCheckins();
   var participants = getParticipants();
 
-  // Find target participant
+  // Find target participant by id or phone
   var target = null;
-  for (var i = 0; i < participants.length; i++) {
-    if (participants[i].phone === cleanTarget) {
-      target = participants[i];
-      break;
+  if (targetId) {
+    for (var i = 0; i < participants.length; i++) {
+      if (participants[i].id.toString() === targetId.toString()) {
+        target = participants[i];
+        break;
+      }
+    }
+  }
+  if (!target && targetPhone) {
+    var cleanTarget = targetPhone.toString().replace(/\D/g, '').slice(-10);
+    for (var j = 0; j < participants.length; j++) {
+      if (participants[j].phone === cleanTarget) {
+        target = participants[j];
+        break;
+      }
     }
   }
 
@@ -394,7 +405,7 @@ function handleGetParticipantCheckins(requestorPhone, targetPhone) {
 
   // Get checkins for target
   var checkins = {};
-  var targetCheckins = allCheckins.filter(function(c) { return c.phone === cleanTarget; });
+  var targetCheckins = allCheckins.filter(function(c) { return c.phone === target.phone; });
   for (var k = 0; k < targetCheckins.length; k++) {
     checkins[targetCheckins[k].date] = targetCheckins[k].status;
   }
