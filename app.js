@@ -1655,7 +1655,8 @@ function renderPersonalProgress(user) {
 }
 
 function calculateStreak(user) {
-    if (!user.checkins) return 0;
+    // If no checkins available, use pre-computed value from API
+    if (!user.checkins) return user.streak || 0;
 
     let streak = 0;
     // Use the participant's timezone for calculating their streak
@@ -1689,12 +1690,14 @@ function calculateStreak(user) {
 }
 
 function calculateTotalWorkouts(user) {
-    if (!user.checkins) return 0;
+    // If no checkins available, use pre-computed value from API
+    if (!user.checkins) return user.totalWorkouts || 0;
     return Object.values(user.checkins).filter(v => v === 'Y').length;
 }
 
 function calculateWeeklyWorkouts(user) {
-    if (!user.checkins) return 0;
+    // If no checkins available, use pre-computed value from API
+    if (!user.checkins) return user.weeklyWorkouts || 0;
     // Use the participant's timezone for calculating their weekly workouts
     const weekStart = getWeekStartForParticipant(user);
     let count = 0;
@@ -2418,7 +2421,7 @@ async function viewParticipantCalendar(identifier) {
 
 // Helper function to calculate streak for any participant (uses their timezone)
 function calculateStreakForParticipant(participant) {
-    if (!participant.checkins) return 0;
+    if (!participant.checkins) return participant.streak || 0;
 
     let streak = 0;
     // Use participant's timezone
@@ -2448,7 +2451,7 @@ function calculateStreakForParticipant(participant) {
 
 // Helper function to calculate weekly workouts for any participant (uses their timezone)
 function calculateWeeklyWorkoutsForParticipant(participant) {
-    if (!participant.checkins) return 0;
+    if (!participant.checkins) return participant.weeklyWorkouts || 0;
     // Use participant's timezone
     const weekStart = getWeekStartForParticipant(participant);
     let count = 0;

@@ -157,6 +157,14 @@ function handleLogin(phone) {
   // Get checkins for all participants
   var allCheckins = getCheckins();
 
+  // Get Monday of current week for weekly calculation
+  var nowDate = new Date();
+  nowDate.setHours(0, 0, 0, 0);
+  var dow = nowDate.getDay();
+  var mondayDiff = dow === 0 ? -6 : 1 - dow;
+  var weekStart = new Date(nowDate);
+  weekStart.setDate(nowDate.getDate() + mondayDiff);
+
   // Attach checkins and calculate stats for each participant
   for (var j = 0; j < participants.length; j++) {
     var p = participants[j];
@@ -170,6 +178,16 @@ function handleLogin(phone) {
     var stats = calculateStats(p.checkins);
     p.totalWorkouts = stats.totalWorkouts;
     p.streak = stats.streak;
+
+    // Calculate weekly workouts (Mon-Sun)
+    var weeklyCount = 0;
+    for (var d = 0; d < 7; d++) {
+      var wd = new Date(weekStart);
+      wd.setDate(weekStart.getDate() + d);
+      var wdStr = Utilities.formatDate(wd, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+      if (p.checkins[wdStr] === 'Y') weeklyCount++;
+    }
+    p.weeklyWorkouts = weeklyCount;
   }
 
   // Find updated user with checkins
@@ -203,6 +221,7 @@ function handleLogin(phone) {
         isAdmin: sp.isAdmin || false,
         isSuperAdmin: sp.isSuperAdmin || false,
         totalWorkouts: sp.totalWorkouts,
+        weeklyWorkouts: sp.weeklyWorkouts,
         streak: sp.streak
       });
     } else {
@@ -216,6 +235,7 @@ function handleLogin(phone) {
         joinDate: sp.joinDate,
         timezone: sp.timezone || '',
         totalWorkouts: sp.totalWorkouts,
+        weeklyWorkouts: sp.weeklyWorkouts,
         streak: sp.streak
       });
     }
