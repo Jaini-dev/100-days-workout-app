@@ -2315,7 +2315,7 @@ async function refreshParticipants() {
 }
 
 // View participant's calendar (read-only)
-function viewParticipantCalendar(phone) {
+async function viewParticipantCalendar(phone) {
     const participant = appState.participants.find(p => {
         const pPhone = (p.phone || '').toString().replace(/\D/g, '').slice(-10);
         const searchPhone = (phone || '').toString().replace(/\D/g, '').slice(-10);
@@ -2333,16 +2333,41 @@ function viewParticipantCalendar(phone) {
         titleEl.textContent = `📅 ${participant.name}'s Calendar`;
     }
 
+    // Show modal with loading state first
+    const calendarEl = $('participant-calendar-content');
+    const statsEl = $('participant-calendar-stats');
+    if (calendarEl) calendarEl.innerHTML = '<p style="text-align:center;padding:20px;">Loading calendar...</p>';
+    if (statsEl) statsEl.innerHTML = '';
+    openModal('participant-calendar-modal');
+
+    // Load checkins on-demand if not available (API no longer sends checkins for other users)
+    const isCurrentUser = appState.currentUser &&
+        (appState.currentUser.phone || '').toString().replace(/\D/g, '').slice(-10) ===
+        (phone || '').toString().replace(/\D/g, '').slice(-10);
+
+    if (!participant.checkins && !isCurrentUser && CONFIG.USE_CLOUD_SYNC) {
+        try {
+            const result = await apiCall('getParticipantCheckins', {
+                phone: appState.currentUser.phone,
+                targetPhone: phone
+            });
+            if (result.success && result.data) {
+                participant.checkins = result.data.checkins;
+            }
+        } catch (e) {
+            console.log('Failed to load participant checkins:', e);
+        }
+    }
+
     // Calculate stats
     const totalWorkouts = participant.checkins ?
-        Object.values(participant.checkins).filter(v => v === 'Y').length : 0;
-    const streak = calculateStreakForParticipant(participant);
-    const weeklyWorkouts = calculateWeeklyWorkoutsForParticipant(participant);
+        Object.values(participant.checkins).filter(v => v === 'Y').length : (participant.totalWorkouts || 0);
+    const streak = participant.checkins ? calculateStreakForParticipant(participant) : (participant.streak || 0);
+    const weeklyWorkouts = participant.checkins ? calculateWeeklyWorkoutsForParticipant(participant) : (participant.weeklyWorkouts || 0);
     const currentDay = getCurrentDay();
     const rate = currentDay > 0 ? Math.round((totalWorkouts / currentDay) * 100) : 0;
 
     // Render stats
-    const statsEl = $('participant-calendar-stats');
     if (statsEl) {
         statsEl.innerHTML = `
             <div class="modal-stat">
@@ -2365,13 +2390,13 @@ function viewParticipantCalendar(phone) {
     }
 
     // Render calendar (read-only)
-    const calendarEl = $('participant-calendar-content');
     if (calendarEl) {
-        calendarEl.innerHTML = renderParticipantCalendarView(participant);
+        if (participant.checkins) {
+            calendarEl.innerHTML = renderParticipantCalendarView(participant);
+        } else {
+            calendarEl.innerHTML = '<p style="text-align:center;padding:20px;color:#999;">Calendar data not available</p>';
+        }
     }
-
-    // Show modal
-    openModal('participant-calendar-modal');
 }
 
 // Helper function to calculate streak for any participant (uses their timezone)

@@ -254,11 +254,12 @@
 
         // Generate weekly summary - compact format with tied rankings
         function generateWeeklySummary() {
-            // Calculate stats for each participant
+            // Stats are pre-computed by the API (totalWorkouts, weeklyWorkouts, streak)
+            // Fallback to local calculation if needed
             participants.forEach(p => {
-                p.totalWorkouts = calculateTotalWorkouts(p);
-                p.weeklyWorkouts = calculateWeeklyWorkouts(p);
-                p.streak = calculateStreak(p);
+                if (p.totalWorkouts === undefined) p.totalWorkouts = calculateTotalWorkouts(p);
+                if (p.weeklyWorkouts === undefined) p.weeklyWorkouts = calculateWeeklyWorkouts(p);
+                if (p.streak === undefined) p.streak = calculateStreak(p);
             });
 
             const weekStart = getWeekStart();
@@ -333,44 +334,27 @@
             return text;
         }
 
-        // Load data from cloud
+        // Load data from cloud using safe endpoint (no login needed, no phones exposed)
         async function loadData() {
-            // First try local storage (most reliable if user has logged in before)
-            const stored = localStorage.getItem(CONFIG.STORAGE_KEY);
-            if (stored) {
-                try {
-                    const data = JSON.parse(stored);
-                    if (data.participants && data.participants.length > 0) {
-                        participants = data.participants;
-                        if (data.challengeSettings) {
-                            challengeSettings = { ...challengeSettings, ...data.challengeSettings };
-                        }
+            try {
+                const response = await fetch(CONFIG.API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({ action: 'getWeeklySummary' })
+                });
+                const result = await response.json();
 
-                        // Try to refresh from cloud using stored user's phone
-                        if (data.currentUser && data.currentUser.phone) {
-                            try {
-                                const response = await fetch(CONFIG.API_URL, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'text/plain' },
-                                    body: JSON.stringify({ action: 'login', phone: data.currentUser.phone })
-                                });
-                                const result = await response.json();
-                                if (result.success && result.data && result.data.participants) {
-                                    participants = result.data.participants;
-                                    console.log('Refreshed data from cloud');
-                                }
-                            } catch (e) {
-                                console.log('Cloud refresh failed, using local data');
-                            }
-                        }
-                        return true;
-                    }
-                } catch (e) {
-                    console.log('Error parsing local storage:', e);
+                if (result.success && result.data && result.data.participants) {
+                    participants = result.data.participants;
+                    console.log('Loaded ' + participants.length + ' participants from cloud');
+                    return true;
                 }
-            }
 
-            return false;
+                throw new Error('No data from cloud');
+            } catch (e) {
+                console.log('Cloud fetch failed:', e);
+                return false;
+            }
         }
 
         // Show states
@@ -400,7 +384,7 @@
             const loaded = await loadData();
 
             if (!loaded || participants.length === 0) {
-                showError('No data found. Please log into the main app first on this device, then come back here.');
+                showError('Could not load data from cloud. Please try again in a moment.');
                 return;
             }
 
