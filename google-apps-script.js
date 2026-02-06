@@ -178,6 +178,8 @@ function handleLogin(phone) {
     var stats = calculateStats(p.checkins);
     p.totalWorkouts = stats.totalWorkouts;
     p.streak = stats.streak;
+    p.bestStreak = stats.bestStreak;
+    p.comebackScore = stats.comebackScore;
 
     // Calculate weekly workouts (Mon-Sun)
     var weeklyCount = 0;
@@ -188,6 +190,10 @@ function handleLogin(phone) {
       if (p.checkins[wdStr] === 'Y') weeklyCount++;
     }
     p.weeklyWorkouts = weeklyCount;
+
+    // Store today's status for display (so other users can see who worked out today)
+    var todayStr = Utilities.formatDate(nowDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    p.todayStatus = p.checkins[todayStr] || null;
   }
 
   // Find updated user with checkins
@@ -222,7 +228,10 @@ function handleLogin(phone) {
         isSuperAdmin: sp.isSuperAdmin || false,
         totalWorkouts: sp.totalWorkouts,
         weeklyWorkouts: sp.weeklyWorkouts,
-        streak: sp.streak
+        streak: sp.streak,
+        bestStreak: sp.bestStreak,
+        comebackScore: sp.comebackScore,
+        todayStatus: sp.todayStatus
       });
     } else {
       // Regular users: NO phone number, use id for lookups instead
@@ -236,7 +245,10 @@ function handleLogin(phone) {
         timezone: sp.timezone || '',
         totalWorkouts: sp.totalWorkouts,
         weeklyWorkouts: sp.weeklyWorkouts,
-        streak: sp.streak
+        streak: sp.streak,
+        bestStreak: sp.bestStreak,
+        comebackScore: sp.comebackScore,
+        todayStatus: sp.todayStatus
       });
     }
   }
@@ -555,6 +567,8 @@ function getCheckins() {
 function calculateStats(checkins) {
   var totalWorkouts = 0;
   var streak = 0;
+  var bestStreak = 0;
+  var comebackScore = 0;
 
   // Count total Y's
   var values = Object.keys(checkins).map(function(key) { return checkins[key]; });
@@ -587,7 +601,86 @@ function calculateStats(checkins) {
     // If today has no checkin, continue checking yesterday
   }
 
-  return { totalWorkouts: totalWorkouts, streak: streak };
+  // Calculate best streak ever
+  var sortedDates = Object.keys(checkins).sort();
+  var currentBestStreak = 0;
+  var lastYesDate = null;
+
+  for (var k = 0; k < sortedDates.length; k++) {
+    var dateStr2 = sortedDates[k];
+    var status = checkins[dateStr2];
+
+    if (status === 'Y') {
+      if (lastYesDate) {
+        var prevDate = new Date(lastYesDate);
+        var currDate = new Date(dateStr2);
+        var daysDiff = Math.floor((currDate - prevDate) / (1000 * 60 * 60 * 24));
+
+        // Check if all days between lastYesDate and current are either 'Y' or 'R'
+        var streakBroken = false;
+        for (var d = 1; d < daysDiff; d++) {
+          var midDate = new Date(prevDate);
+          midDate.setDate(midDate.getDate() + d);
+          var midDateStr = Utilities.formatDate(midDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+          var midStatus = checkins[midDateStr];
+          if (midStatus !== 'R' && midStatus !== 'Y') {
+            streakBroken = true;
+            break;
+          }
+        }
+
+        if (!streakBroken && daysDiff >= 1) {
+          currentBestStreak++;
+        } else if (streakBroken) {
+          currentBestStreak = 1;
+        } else {
+          currentBestStreak = 1;
+        }
+      } else {
+        currentBestStreak = 1;
+      }
+      bestStreak = Math.max(bestStreak, currentBestStreak);
+      lastYesDate = dateStr2;
+    } else if (status === 'N') {
+      currentBestStreak = 0;
+      lastYesDate = null;
+    }
+  }
+
+  // Calculate comeback score (workouts in last 7 days after a 3+ day break)
+  var recentWorkouts = 0;
+  var hadBreak = false;
+
+  // Check last 7 days for workouts
+  for (var r = 0; r < 7; r++) {
+    var recentDate = new Date(today);
+    recentDate.setDate(recentDate.getDate() - r);
+    var recentDateStr = Utilities.formatDate(recentDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    if (checkins[recentDateStr] === 'Y') recentWorkouts++;
+  }
+
+  // Check if they had a break (3+ days without workout) in days 8-21
+  var consecutiveMissed = 0;
+  for (var b = 7; b < 21; b++) {
+    var breakDate = new Date(today);
+    breakDate.setDate(breakDate.getDate() - b);
+    var breakDateStr = Utilities.formatDate(breakDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    if (checkins[breakDateStr] !== 'Y') {
+      consecutiveMissed++;
+      if (consecutiveMissed >= 3) hadBreak = true;
+    } else {
+      consecutiveMissed = 0;
+    }
+  }
+
+  comebackScore = hadBreak ? recentWorkouts : 0;
+
+  return {
+    totalWorkouts: totalWorkouts,
+    streak: streak,
+    bestStreak: bestStreak,
+    comebackScore: comebackScore
+  };
 }
 
 // Get current day of challenge (day in the challenge period, 1-181)

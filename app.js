@@ -310,7 +310,8 @@ function hashPassword(password) {
 // Best streak ever (for personal progress)
 // Rest days ('R') don't break streaks, but don't count towards them either
 function calculateBestStreak(user) {
-    if (!user.checkins) return 0;
+    // If no checkins available, use pre-computed value from API
+    if (!user.checkins) return user.bestStreak || 0;
 
     const entries = Object.entries(user.checkins).sort((a, b) => a[0].localeCompare(b[0]));
     let bestStreak = 0;
@@ -423,7 +424,8 @@ function isReturningAfterBreak(user) {
 
 // Calculate comeback score (workouts in last 7 days after break)
 function calculateComebackScore(user) {
-    if (!user.checkins) return 0;
+    // If no checkins available, use pre-computed value from API
+    if (!user.checkins) return user.comebackScore || 0;
 
     const today = new Date();
     let recentWorkouts = 0;
@@ -2181,7 +2183,7 @@ function renderAllParticipants() {
         const isMe = isCurrentUser(p);
         const rank = getTiedRank(sorted, index, 'all');
         const rate = currentDay > 0 ? Math.round((p.totalWorkouts / currentDay) * 100) : 0;
-        const todayStatus = p.checkins ? p.checkins[todayDate] : null;
+        const todayStatus = p.checkins ? p.checkins[todayDate] : p.todayStatus;
         const todayIcon = todayStatus === 'Y' ? '✅' : todayStatus === 'R' ? '🧘' : todayStatus === 'N' ? '❌' : '⏳';
 
         html += `
@@ -2261,10 +2263,11 @@ function renderParticipantsScreen() {
     const sorted = getSortedParticipants('all');
     const todayDate = getTodayString();
 
-    // Count active today
-    const activeToday = sorted.filter(p =>
-        p.checkins && (p.checkins[todayDate] === 'Y' || p.checkins[todayDate] === 'R')
-    ).length;
+    // Count active today (use todayStatus from API when checkins not available)
+    const activeToday = sorted.filter(p => {
+        const status = p.checkins ? p.checkins[todayDate] : p.todayStatus;
+        return status === 'Y' || status === 'R';
+    }).length;
 
     if (totalEl) totalEl.textContent = sorted.length;
     if (activeEl) activeEl.textContent = activeToday;
@@ -2289,7 +2292,7 @@ function renderParticipantsList(participants) {
         const sortedIndex = sorted.findIndex(sp => getParticipantKey(sp) === pKey);
         const rank = getTiedRank(sorted, sortedIndex >= 0 ? sortedIndex : index, 'all');
 
-        const todayStatus = p.checkins ? p.checkins[todayDate] : null;
+        const todayStatus = p.checkins ? p.checkins[todayDate] : p.todayStatus;
         const todayIcon = todayStatus === 'Y' ? '✅' : todayStatus === 'R' ? '🧘' : todayStatus === 'N' ? '❌' : '⏳';
 
         const rankClass = rank === 1 ? 'top-1' : rank === 2 ? 'top-2' : rank === 3 ? 'top-3' : '';
@@ -2925,7 +2928,7 @@ function shareGroupProgress(type = 'today') {
         let pending = 0;
 
         sorted.forEach(p => {
-            const checkin = p.checkins ? p.checkins[todayDate] : null;
+            const checkin = p.checkins ? p.checkins[todayDate] : p.todayStatus;
             if (checkin === 'Y' || checkin === 'R') checkedIn++;
             else if (checkin === 'N') skipped++;
             else pending++;
@@ -2939,8 +2942,11 @@ function shareGroupProgress(type = 'today') {
         text += `⏳ *Pending:* ${pending}\n`;
         text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
 
-        // Today's warriors with total days
-        const todayWarriors = sorted.filter(p => p.checkins && (p.checkins[todayDate] === 'Y' || p.checkins[todayDate] === 'R'));
+        // Today's warriors with total days (use todayStatus when checkins not available)
+        const todayWarriors = sorted.filter(p => {
+            const status = p.checkins ? p.checkins[todayDate] : p.todayStatus;
+            return status === 'Y' || status === 'R';
+        });
         if (todayWarriors.length > 0) {
             text += `*🔥 Today's Warriors:*\n`;
             todayWarriors.forEach(p => {
@@ -2948,8 +2954,11 @@ function shareGroupProgress(type = 'today') {
             });
         }
 
-        // Show who's pending
-        const pendingUsers = sorted.filter(p => !p.checkins || (!p.checkins[todayDate]));
+        // Show who's pending (use todayStatus when checkins not available)
+        const pendingUsers = sorted.filter(p => {
+            const status = p.checkins ? p.checkins[todayDate] : p.todayStatus;
+            return !status;
+        });
         if (pendingUsers.length > 0 && pendingUsers.length <= 5) {
             text += `\n⏳ *Still waiting for:*\n`;
             pendingUsers.forEach(p => {
@@ -3056,10 +3065,10 @@ function renderAdminDashboard() {
     const todayDate = getTodayString();
     const currentDay = getCurrentDay();
 
-    // Stats
+    // Stats (use todayStatus when checkins not available)
     let todayYes = 0, todayNo = 0, todayPending = 0;
     sorted.forEach(p => {
-        const checkin = p.checkins ? p.checkins[todayDate] : null;
+        const checkin = p.checkins ? p.checkins[todayDate] : p.todayStatus;
         if (checkin === 'Y') todayYes++;
         else if (checkin === 'N') todayNo++;
         else todayPending++;
@@ -3096,7 +3105,7 @@ function renderAdminDashboard() {
         const isSuperAdmin = p.isSuperAdmin;
         const rank = getTiedRank(sorted, index, 'all');
         const rate = currentDay > 0 ? Math.round((p.totalWorkouts / currentDay) * 100) : 0;
-        const todayStatus = p.checkins ? p.checkins[todayDate] : null;
+        const todayStatus = p.checkins ? p.checkins[todayDate] : p.todayStatus;
         const todayIcon = todayStatus === 'Y' ? '✅' : todayStatus === 'N' ? '❌' : '⏳';
 
         html += `
@@ -3161,13 +3170,22 @@ function renderAdminDashboard() {
 
 function renderMiniHistory(participant) {
     const today = new Date();
+    const todayStr = getDateString(today);
     let html = '';
 
     for (let i = 6; i >= 0; i--) {
         const date = new Date(today);
         date.setDate(date.getDate() - i);
         const dateStr = getDateString(date);
-        const checkin = participant.checkins ? participant.checkins[dateStr] : null;
+
+        // Use checkins if available, otherwise use todayStatus for today only
+        let checkin = null;
+        if (participant.checkins) {
+            checkin = participant.checkins[dateStr];
+        } else if (dateStr === todayStr) {
+            // For other participants without checkins, we only have today's status from API
+            checkin = participant.todayStatus;
+        }
 
         let statusClass = 'pending';
         let icon = '·';
@@ -3177,6 +3195,9 @@ function renderMiniHistory(participant) {
         } else if (checkin === 'N') {
             statusClass = 'no';
             icon = '✗';
+        } else if (checkin === 'R') {
+            statusClass = 'rest';
+            icon = '○';
         }
 
         const dayName = ['S', 'M', 'T', 'W', 'T', 'F', 'S'][date.getDay()];
