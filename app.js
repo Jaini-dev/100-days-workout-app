@@ -3049,6 +3049,145 @@ function shareGroupProgress(type = 'today') {
     }
 }
 
+// Show date range modal for custom share
+function showDateRangeShare() {
+    // Set default dates (last week)
+    setShareDateRange('lastWeek');
+    openModal('date-range-modal');
+}
+
+// Set date range based on quick select
+function setShareDateRange(preset) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let startDate, endDate;
+
+    switch (preset) {
+        case 'lastWeek':
+            // Last Monday to Sunday
+            const dayOfWeek = today.getDay();
+            const daysToLastMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+            endDate = new Date(today);
+            endDate.setDate(today.getDate() - daysToLastMonday - 1); // Last Sunday
+            startDate = new Date(endDate);
+            startDate.setDate(endDate.getDate() - 6); // Last Monday
+            break;
+        case 'last7':
+            endDate = new Date(today);
+            endDate.setDate(today.getDate() - 1); // Yesterday
+            startDate = new Date(endDate);
+            startDate.setDate(endDate.getDate() - 6); // 7 days ago
+            break;
+        case 'thisMonth':
+            startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            endDate = new Date(today);
+            break;
+        case 'allTime':
+            startDate = new Date(challengeSettings.startDate);
+            endDate = new Date(today);
+            break;
+        default:
+            return;
+    }
+
+    $('share-start-date').value = getDateString(startDate);
+    $('share-end-date').value = getDateString(endDate);
+}
+
+// Generate and share custom date range progress
+function shareCustomDateRange() {
+    const startDateStr = $('share-start-date').value;
+    const endDateStr = $('share-end-date').value;
+
+    if (!startDateStr || !endDateStr) {
+        showToast('Please select both dates', 'error');
+        return;
+    }
+
+    const startDate = new Date(startDateStr);
+    const endDate = new Date(endDateStr);
+
+    if (startDate > endDate) {
+        showToast('Start date must be before end date', 'error');
+        return;
+    }
+
+    closeModal('date-range-modal');
+
+    // Calculate stats for date range
+    const sorted = getSortedParticipants('all');
+    const rangeStats = [];
+
+    sorted.forEach(p => {
+        let workoutsInRange = 0;
+        let daysInRange = 0;
+
+        // Count workouts in the date range
+        const currentDate = new Date(startDate);
+        while (currentDate <= endDate) {
+            daysInRange++;
+            const dateStr = getDateString(currentDate);
+            const status = p.checkins ? p.checkins[dateStr] : null;
+            if (status === 'Y') workoutsInRange++;
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        rangeStats.push({
+            name: p.name,
+            workouts: workoutsInRange,
+            days: daysInRange,
+            totalWorkouts: p.totalWorkouts,
+            streak: p.streak
+        });
+    });
+
+    // Sort by workouts in range
+    rangeStats.sort((a, b) => b.workouts - a.workouts);
+
+    const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+    const totalWorkoutsInRange = rangeStats.reduce((sum, p) => sum + p.workouts, 0);
+
+    // Format dates for display
+    const formatRange = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+    let text = `*📊 100 Days of Workout - Progress Report*\n`;
+    text += `📅 ${formatRange(startDate)} - ${formatRange(endDate)} (${totalDays} days)\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+    text += `💪 *Total Workouts:* ${totalWorkoutsInRange}\n`;
+    text += `👥 *Participants:* ${rangeStats.length}\n\n`;
+
+    text += `*🏆 Top Performers:*\n`;
+    const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+    rangeStats.slice(0, 5).forEach((p, i) => {
+        const rate = totalDays > 0 ? Math.round((p.workouts / totalDays) * 100) : 0;
+        text += `${medals[i]} *${p.name}:* ${p.workouts}/${totalDays} days (${rate}%)\n`;
+    });
+
+    // Perfect scores (if any)
+    const perfectScores = rangeStats.filter(p => p.workouts === totalDays);
+    if (perfectScores.length > 0 && perfectScores.length <= 10) {
+        text += `\n*🌟 Perfect Score (${totalDays}/${totalDays}):*\n`;
+        perfectScores.forEach(p => {
+            text += `• ${p.name}\n`;
+        });
+    }
+
+    // Group average
+    const avgWorkouts = rangeStats.length > 0 ? (totalWorkoutsInRange / rangeStats.length).toFixed(1) : 0;
+    const avgRate = totalDays > 0 && rangeStats.length > 0 ? Math.round((avgWorkouts / totalDays) * 100) : 0;
+    text += `\n━━━━━━━━━━━━━━━━━━━━\n`;
+    text += `📈 *Average:* ${avgWorkouts} workouts (${avgRate}%)\n`;
+
+    text += `\n#100DaysOfWorkout`;
+
+    if (navigator.share) {
+        navigator.share({ text });
+    } else {
+        navigator.clipboard.writeText(text);
+        showToast('Custom report copied to clipboard!', 'success');
+    }
+}
+
 // ============================================
 // ADMIN DASHBOARD
 // ============================================
@@ -3765,6 +3904,9 @@ window.enableReminders = enableReminders;
 window.dismissGoalReminder = dismissGoalReminder;
 window.shareProgress = shareProgress;
 window.shareGroupProgress = shareGroupProgress;
+window.showDateRangeShare = showDateRangeShare;
+window.setShareDateRange = setShareDateRange;
+window.shareCustomDateRange = shareCustomDateRange;
 window.toggleAllParticipants = toggleAllParticipants;
 window.filterParticipants = filterParticipants;
 window.refreshParticipants = refreshParticipants;

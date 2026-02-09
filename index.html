@@ -463,6 +463,11 @@
                         <span>🏆</span> Leaderboard
                     </button>
                 </div>
+                <div class="admin-actions">
+                    <button class="btn-secondary" onclick="showDateRangeShare()">
+                        <span>📆</span> Custom Range
+                    </button>
+                </div>
             </div>
 
             <!-- Admin Actions -->
@@ -725,6 +730,39 @@
             <div class="modal-footer">
                 <button class="btn-secondary" onclick="closeModal('challenge-settings-modal')">Cancel</button>
                 <button class="btn-primary" onclick="saveChallengeSettings()">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Date Range Share Modal -->
+    <div id="date-range-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📆 Share Custom Date Range</h3>
+                <button class="modal-close" onclick="closeModal('date-range-modal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Start Date</label>
+                    <input type="date" id="share-start-date" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>End Date</label>
+                    <input type="date" id="share-end-date" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Quick Select</label>
+                    <div class="quick-date-btns">
+                        <button class="btn-small" onclick="setShareDateRange('lastWeek')">Last Week</button>
+                        <button class="btn-small" onclick="setShareDateRange('last7')">Last 7 Days</button>
+                        <button class="btn-small" onclick="setShareDateRange('thisMonth')">This Month</button>
+                        <button class="btn-small" onclick="setShareDateRange('allTime')">All Time</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal('date-range-modal')">Cancel</button>
+                <button class="btn-primary" onclick="shareCustomDateRange()">📤 Generate & Share</button>
             </div>
         </div>
     </div>

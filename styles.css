@@ -359,6 +359,31 @@ body {
     color: white;
 }
 
+.btn-small {
+    padding: 8px 12px;
+    background: var(--gray-100);
+    color: var(--gray-700);
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-small:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.quick-date-btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
 .btn-danger {
     width: 100%;
     padding: 14px 32px;
