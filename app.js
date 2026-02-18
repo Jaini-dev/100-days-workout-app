@@ -577,6 +577,24 @@ async function refreshFromCloud() {
     return result;
 }
 
+// Silently fetch fresh participant data from cloud without showing loading/toast
+async function silentRefreshFromCloud() {
+    if (!appState.currentUser || !appState.currentUser.phone || !CONFIG.USE_CLOUD_SYNC) {
+        return { success: false };
+    }
+    try {
+        const result = await apiCall('login', { phone: appState.currentUser.phone });
+        if (result.success && result.data) {
+            appState.participants = result.data.participants || [];
+            appState.currentUser = result.data.user;
+            saveData();
+        }
+        return result;
+    } catch (e) {
+        return { success: false };
+    }
+}
+
 function loadData() {
     try {
         const saved = localStorage.getItem(CONFIG.STORAGE_KEY);
@@ -815,6 +833,10 @@ function showTab(tab) {
         case 'leaderboard':
             showScreen('leaderboard-screen');
             renderLeaderboard('all');
+            // Refresh from cloud so all users see consistent, up-to-date counts
+            silentRefreshFromCloud().then(result => {
+                if (result.success) renderLeaderboard(appState.leaderboardCategory || 'all');
+            });
             break;
         case 'calendar':
             showScreen('calendar-screen');
@@ -831,6 +853,10 @@ function showTab(tab) {
         case 'participants':
             showScreen('participants-screen');
             renderParticipantsScreen();
+            // Refresh from cloud so all users see consistent, up-to-date counts
+            silentRefreshFromCloud().then(result => {
+                if (result.success) renderParticipantsScreen();
+            });
             break;
     }
 }
