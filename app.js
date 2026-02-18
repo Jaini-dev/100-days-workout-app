@@ -577,16 +577,36 @@ async function refreshFromCloud() {
     return result;
 }
 
-// Silently fetch fresh participant data from cloud without showing loading/toast
+// Silently fetch fresh participant data from cloud without showing loading/toast.
+// Preserves the current user's local checkins so unsynced workouts are never lost.
 async function silentRefreshFromCloud() {
     if (!appState.currentUser || !appState.currentUser.phone || !CONFIG.USE_CLOUD_SYNC) {
         return { success: false };
     }
     try {
+        // Snapshot local checkins BEFORE the network call so we don't lose
+        // any workout that was recorded locally but hasn't synced yet.
+        const localCheckins = appState.currentUser.checkins
+            ? { ...appState.currentUser.checkins }
+            : null;
+
         const result = await apiCall('login', { phone: appState.currentUser.phone });
         if (result.success && result.data) {
             appState.participants = result.data.participants || [];
             appState.currentUser = result.data.user;
+
+            // Merge server checkins with local checkins (local wins per date so
+            // unsynced 'Y' entries are still counted for the current user).
+            if (localCheckins) {
+                const merged = { ...result.data.user.checkins, ...localCheckins };
+                appState.currentUser.checkins = merged;
+                // Keep the current user's participants-array entry in sync too.
+                const currentPhone = appState.currentUser.phone;
+                const idx = appState.participants.findIndex(p => p.phone === currentPhone);
+                if (idx >= 0) {
+                    appState.participants[idx].checkins = merged;
+                }
+            }
             saveData();
         }
         return result;
@@ -3814,6 +3834,12 @@ document.addEventListener('DOMContentLoaded', () => {
         appState.isAdmin = appState.currentUser.isAdmin || false;
         appState.isSuperAdmin = appState.currentUser.isSuperAdmin || false;
         showTab('home');
+
+        // Silently refresh all participant data on startup so cached counts
+        // are replaced with current server values as soon as possible.
+        silentRefreshFromCloud().then(result => {
+            if (result.success) updateDashboard();
+        });
 
         // Check for reminders after a delay
         setTimeout(checkForReminders, 3000);
