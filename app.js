@@ -2677,7 +2677,8 @@ function renderCalendar() {
             const isFuture = daysDiff < 0;
 
             // Check if this day can be edited (within MAX_PAST_DAYS)
-            const canEdit = daysDiff >= 0 && daysDiff <= CONFIG.MAX_PAST_DAYS;
+            // isToday is always editable; past days within the window are editable
+            const canEdit = isToday || (isPast && daysDiff <= CONFIG.MAX_PAST_DAYS);
 
             let statusClass = '';
 
