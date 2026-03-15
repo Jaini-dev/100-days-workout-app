@@ -145,6 +145,10 @@ const QUOTES = {
 };
 
 // ============================================
+// Cloud sync cache to avoid redundant API calls
+let lastCloudSync = 0;
+const CLOUD_SYNC_CACHE_MS = 60 * 1000; // 1 minute
+
 // APP STATE
 // ============================================
 let appState = {
@@ -540,12 +544,18 @@ async function cloudRegister(userData) {
     return result;
 }
 
-async function cloudLogin(phone) {
-    showLoading();
+async function cloudLogin(phone, silent = false) {
+    // If silent and data is fresh, skip the API call
+    if (silent && appState.currentUser && (Date.now() - lastCloudSync) < CLOUD_SYNC_CACHE_MS) {
+        return { success: true, data: { participants: appState.participants, user: appState.currentUser } };
+    }
+
+    if (!silent) showLoading();
     const result = await apiCall('login', { phone });
-    hideLoading();
+    if (!silent) hideLoading();
 
     if (result.success && result.data) {
+        lastCloudSync = Date.now();
         // Update local state with cloud data
         appState.participants = result.data.participants || [];
         appState.currentUser = result.data.user;
@@ -558,8 +568,8 @@ async function cloudCheckin(phone, date, status) {
     const result = await apiCall('checkin', { phone, date, status });
 
     if (result.success) {
-        // Refresh data from cloud
-        await cloudLogin(phone);
+        // Silently refresh data from cloud (no loading overlay)
+        await cloudLogin(phone, true);
     }
     return result;
 }
@@ -569,6 +579,7 @@ async function refreshFromCloud() {
         return { success: false, error: 'Not logged in' };
     }
 
+    lastCloudSync = 0; // Force a fresh fetch
     const result = await cloudLogin(appState.currentUser.phone);
     if (result.success) {
         showToast('Data refreshed!', 'success');
@@ -2657,13 +2668,16 @@ function renderCalendar() {
             const i = dayData.dayIndex;
             const dateStr = getDateString(date);
             const checkin = user.checkins ? user.checkins[dateStr] : null;
-            const isPast = date < today;
-            const isToday = dateStr === getTodayString();
-            const isFuture = date > today;
+            // Use string-based comparison to avoid timezone issues
+            // (calendar date objects are UTC midnight, but today is local midnight)
+            const todayStr = getTodayString();
+            const isToday = dateStr === todayStr;
+            const daysDiff = Math.floor((new Date(todayStr) - new Date(dateStr)) / (1000 * 60 * 60 * 24));
+            const isPast = !isToday && daysDiff > 0;
+            const isFuture = daysDiff < 0;
 
             // Check if this day can be edited (within MAX_PAST_DAYS)
-            const daysDiff = Math.floor((today - date) / (1000 * 60 * 60 * 24));
-            const canEdit = daysDiff <= CONFIG.MAX_PAST_DAYS && daysDiff >= 0;
+            const canEdit = daysDiff >= 0 && daysDiff <= CONFIG.MAX_PAST_DAYS;
 
             let statusClass = '';
 
