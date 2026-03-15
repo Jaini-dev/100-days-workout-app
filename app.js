@@ -2704,10 +2704,10 @@ function renderCalendar() {
 
             // Make days clickable if within edit window (for adding, editing, or deleting)
             const clickable = canEdit ? 'clickable' : '';
-            const onClick = clickable ? `onclick="openDayEditor('${dateStr}', '${checkin || ''}')"` : '';
+            const dataAttrs = canEdit ? `data-date="${dateStr}" data-checkin="${checkin || ''}"` : '';
 
             html += `
-                <div class="cal-day ${statusClass} ${clickable}" ${onClick} title="Day ${i + 1} - ${formatShortDate(date)}">
+                <div class="cal-day ${statusClass} ${clickable}" ${dataAttrs} title="Day ${i + 1} - ${formatShortDate(date)}">
                     <span class="cal-date">${date.getDate()}</span>
                     <span class="cal-day-num">D${i + 1}</span>
                 </div>
@@ -2755,6 +2755,14 @@ function renderCalendar() {
     `;
 
     container.innerHTML = html;
+
+    // Use event delegation instead of inline onclick to reliably handle clicks (including today)
+    container.onclick = (e) => {
+        const cell = e.target.closest('.cal-day[data-date]');
+        if (cell) {
+            openDayEditor(cell.dataset.date, cell.dataset.checkin);
+        }
+    };
 }
 
 function quickLogFromCalendar(dateStr) {
