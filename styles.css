@@ -4348,16 +4348,17 @@ body {
    Card Builder, Hall of Fame
    ============================================ */
 
-/* Confetti canvas — sits above everything */
+/* Confetti canvas — shown/hidden via JS only */
 .confetti-canvas {
     position: fixed;
     inset: 0;
-    z-index: 1200;
+    z-index: 1201;
     pointer-events: none;
     display: none;
 }
-#century-club-overlay.active ~ canvas,
-.confetti-canvas { display: block; }
+
+/* Hamburger sits above canvas */
+.hamburger-btn { z-index: 1202 !important; }
 
 /* Century Club full-screen celebration overlay */
 .century-club-overlay {
@@ -4904,4 +4905,47 @@ body {
 .btn-purple {
     background: #7c3aed;
     color: #fff;
+}
+
+/* Card builder modal — proper contained scrollable box */
+.cc-modal-content {
+    max-height: 92vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    display: flex;
+    flex-direction: column;
+    border-radius: 20px;
+}
+
+.cc-modal .modal-body {
+    padding: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    flex: 1;
+}
+
+/* Smaller card preview on mobile */
+.cc-card-preview {
+    min-height: 260px;
+    max-height: 280px;
+}
+
+/* Hall of Fame back button */
+.hof-back-btn {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 2;
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: #fff;
+    font-size: 20px;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
 }

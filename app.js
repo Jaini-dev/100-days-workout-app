@@ -3998,6 +3998,7 @@ function closeCenturyOverlay() {
 function startConfetti() {
     const canvas = $('confetti-canvas');
     if (!canvas) return;
+    canvas.style.display = 'block';
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     const ctx = canvas.getContext('2d');
@@ -4046,6 +4047,7 @@ function stopConfetti() {
     if (canvas) {
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        canvas.style.display = 'none';
     }
 }
 

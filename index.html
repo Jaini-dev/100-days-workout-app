@@ -815,15 +815,16 @@
                 <div class="cc-cel-stat"><span id="cc-cel-streak">0</span><small>Day Streak</small></div>
                 <div class="cc-cel-stat"><span id="cc-cel-rate">0%</span><small>Consistency</small></div>
             </div>
-            <button class="cc-cel-btn-primary" onclick="openCardBuilder()">🎨 Build My Card</button>
+            <button class="cc-cel-btn-primary" onclick="openCardBuilder()">🎨 Share it with the group</button>
             <button class="cc-cel-btn-secondary" onclick="closeCenturyOverlay()">Maybe later</button>
         </div>
     </div>
 
     <!-- Card Builder Modal -->
     <div id="card-builder-modal" class="modal cc-modal">
+      <div class="modal-content cc-modal-content">
         <div class="modal-header">
-            <h3 class="modal-title">✨ Build Your Card</h3>
+            <h3 class="modal-title">✨ Share it with the group</h3>
             <button class="modal-close" onclick="closeModal('card-builder-modal')">×</button>
         </div>
         <div class="modal-body cc-builder-body">
@@ -870,12 +871,14 @@
                 <button class="btn-primary" onclick="saveCenturyCard()">🏆 Save to Hall of Fame</button>
             </div>
         </div>
+      </div>
     </div>
 
     <!-- Hall of Fame Screen -->
     <div id="halloffame-screen" class="screen">
         <div class="hof-header">
             <div class="hof-header-bg"></div>
+            <button class="hof-back-btn" onclick="showTab('home')">←</button>
             <div class="hof-header-content">
                 <div class="hof-header-icon">🏆</div>
                 <h1 class="hof-header-title">Hall of Fame</h1>
