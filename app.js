@@ -2671,9 +2671,9 @@ function renderCalendar() {
             const isToday = dateStr === getTodayString();
             const isFuture = date > today;
 
-            // Check if this day can be edited (within MAX_PAST_DAYS)
+            // Any past day (and today) can be edited; only future days are locked.
             const daysDiff = Math.floor((today - date) / (1000 * 60 * 60 * 24));
-            const canEdit = daysDiff <= CONFIG.MAX_PAST_DAYS && daysDiff >= 0;
+            const canEdit = daysDiff >= 0;
 
             let statusClass = '';
 
@@ -2745,7 +2745,7 @@ function renderCalendar() {
     // Hint for clickable days
     html += `
         <div class="calendar-hint">
-            💡 Tap on any day within the last ${CONFIG.MAX_PAST_DAYS} days to log, edit, or delete
+            💡 Tap on any past day or today to log, edit, or delete
         </div>
     `;
 
