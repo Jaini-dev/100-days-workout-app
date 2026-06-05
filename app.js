@@ -555,13 +555,14 @@ async function cloudLogin(phone) {
 }
 
 async function cloudCheckin(phone, date, status) {
-    const result = await apiCall('checkin', { phone, date, status });
-
-    if (result.success) {
-        // Refresh data from cloud
-        await cloudLogin(phone);
-    }
-    return result;
+    // NOTE: We intentionally do NOT re-fetch the full profile from the cloud here.
+    // submitCheckin() has already updated local state optimistically. When a user
+    // logs several days in quick succession, multiple checkin requests are in
+    // flight at once. A full re-fetch (cloudLogin) that returns before the other
+    // writes have been persisted would overwrite local state with stale data and
+    // wipe out the days the user just tapped. The write below is enough to persist
+    // this single day; a manual refresh pulls everything else back down.
+    return await apiCall('checkin', { phone, date, status });
 }
 
 async function refreshFromCloud() {
@@ -2597,8 +2598,15 @@ function renderCalendar() {
     if (!container || !appState.currentUser) return;
 
     const user = appState.currentUser;
-    const startDate = new Date(challengeSettings.startDate);
-    const today = new Date();
+    // Parse the challenge start as a LOCAL calendar date. Using new Date('YYYY-MM-DD')
+    // parses as UTC midnight, which leaves a timezone-offset time component on every
+    // generated day. Compared against a local-midnight `today`, the daysDiff math
+    // below would floor incorrectly and shift the editable window by a day (and shift
+    // the calendar dates entirely in non-IST timezones).
+    const [startY, startM, startD] = challengeSettings.startDate.split('-').map(Number);
+    const startDate = new Date(startY, startM - 1, startD);
+    // Use the user's timezone-aware "today" (local midnight) for consistent math.
+    const today = getUserLocalDate();
     today.setHours(0, 0, 0, 0);
 
     let totalWorkouts = 0;
@@ -2609,8 +2617,10 @@ function renderCalendar() {
                     'July', 'August', 'September', 'October', 'November', 'December'];
     const dayNames = ['M', 'T', 'W', 'T', 'F', 'S', 'S']; // Week starts Monday
 
-    // Calculate total days in challenge period (181 days from Feb 1 to July 31)
-    const endDate = new Date(challengeSettings.endDate);
+    // Calculate total days in challenge period (181 days from Feb 1 to July 31).
+    // Parse as a LOCAL calendar date for the same reason as startDate above.
+    const [endY, endM, endD] = challengeSettings.endDate.split('-').map(Number);
+    const endDate = new Date(endY, endM - 1, endD);
     const periodDays = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
 
     // Group days by month
