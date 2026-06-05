@@ -4145,7 +4145,7 @@ function refreshCardPreview() {
 
     const photoHTML = _cardPhotoDataUrl
         ? `<img src="${_cardPhotoDataUrl}" class="cc-card-photo" alt="photo">`
-        : `<div class="cc-card-photo cc-card-photo-placeholder">😤</div>`;
+        : `<div class="cc-card-photo cc-card-photo-placeholder">💪</div>`;
 
     const card = $('cc-card-preview');
     if (!card) return;
@@ -4219,11 +4219,7 @@ function renderHallOfFame() {
 
     const completers = appState.participants.filter(p =>
         calculateTotalWorkouts(p) >= 100
-    ).sort((a, b) => {
-        const aDate = a.centuryClub?.unlockedAt || '';
-        const bDate = b.centuryClub?.unlockedAt || '';
-        return aDate.localeCompare(bDate);
-    });
+    ).sort((a, b) => calculateTotalWorkouts(b) - calculateTotalWorkouts(a));
 
     $('halloffame-count').textContent = completers.length;
 
@@ -4243,10 +4239,10 @@ function renderHallOfFame() {
         const total = calculateTotalWorkouts(p);
         const streak = calculateStreak(p);
         const proudMoment = club.proudMoment || '100 days of showing up!';
-        const title = club.title || '🏆 The Legend';
+        const title = club.title || assignCenturyTitle(p);
         const photoHTML = club.photo
             ? `<img src="${club.photo}" class="hof-card-photo" alt="">`
-            : `<div class="hof-card-photo hof-card-photo-placeholder">😤</div>`;
+            : `<div class="hof-card-photo hof-card-photo-placeholder">💪</div>`;
         const completedDate = club.unlockedAt
             ? new Date(club.unlockedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
             : '';
