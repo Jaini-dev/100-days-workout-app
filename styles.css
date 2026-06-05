@@ -4537,23 +4537,23 @@ body {
 }
 
 .cc-card-photo {
-    width: 54px;
-    height: 54px;
+    width: 68px;
+    height: 68px;
     border-radius: 50%;
     object-fit: cover;
-    border: 2px solid rgba(255,255,255,0.6);
-    box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+    border: 3px solid rgba(255,255,255,0.7);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
 .cc-card-photo-placeholder {
-    width: 54px;
-    height: 54px;
+    width: 68px;
+    height: 68px;
     border-radius: 50%;
     background: rgba(255,255,255,0.2);
-    border: 2px solid rgba(255,255,255,0.4);
+    border: 3px solid rgba(255,255,255,0.5);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 26px;
+    font-size: 32px;
 }
 
 .hof-card-photo {
@@ -4644,94 +4644,109 @@ body {
     text-align: center;
 }
 
-/* Builder UI */
+/* Builder form */
+.cc-builder-body {
+    padding: 0 0 100px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+/* Card preview — full width, no side padding */
+.cc-card-preview {
+    border-radius: 0;
+    margin: 0;
+    box-shadow: none;
+    border-bottom: 4px solid rgba(0,0,0,0.08);
+}
+
+.cc-card-inner {
+    padding: 20px 20px 16px;
+    gap: 6px;
+}
+
+/* Form sections */
 .cc-builder-section {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
+    padding: 18px 16px;
+    border-bottom: 1px solid var(--gray-100);
 }
 
 .cc-builder-label {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--gray-700);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
 }
 
+/* Photo upload — full width tap target */
 .cc-photo-upload-btn {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     justify-content: center;
-    padding: 10px 20px;
-    border-radius: 10px;
+    gap: 8px;
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
     border: 2px dashed var(--gray-300);
     color: var(--gray-500);
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 600;
     cursor: pointer;
-    transition: border-color 0.2s, color 0.2s;
-    align-self: flex-start;
+    background: var(--gray-50);
+    transition: all 0.2s;
 }
-.cc-photo-upload-btn:hover { border-color: var(--primary); color: var(--primary); }
+.cc-photo-upload-btn:active { border-color: var(--primary); color: var(--primary); background: #eef2ff; }
 
 .cc-proud-input {
     width: 100%;
-    padding: 11px 14px;
+    padding: 13px 14px;
     border: 1.5px solid var(--gray-200);
-    border-radius: 10px;
-    font-size: 14px;
+    border-radius: 12px;
+    font-size: 15px;
     font-family: inherit;
     outline: none;
-    transition: border-color 0.2s;
-}
-.cc-proud-input:focus { border-color: var(--primary); }
-
-.cc-title-pills {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-.cc-title-pill {
-    padding: 7px 14px;
-    border-radius: 50px;
-    border: 2px solid var(--gray-200);
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.15s;
-    color: var(--gray-600);
     background: var(--gray-50);
-    white-space: nowrap;
+    transition: border-color 0.2s, background 0.2s;
 }
-.cc-title-pill.selected {
-    border-color: var(--primary);
-    background: var(--primary);
-    color: #fff;
-}
+.cc-proud-input:focus { border-color: var(--primary); background: #fff; }
 
 .cc-theme-dots {
     display: flex;
-    gap: 12px;
+    gap: 14px;
+    flex-wrap: wrap;
 }
 
 .cc-theme-dot {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     cursor: pointer;
     border: 3px solid transparent;
     transition: transform 0.15s, border-color 0.15s;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.2);
 }
 .cc-theme-dot.selected {
     border-color: var(--gray-800);
-    transform: scale(1.2);
+    transform: scale(1.18);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
 }
 
 .cc-builder-actions {
     display: flex;
     gap: 10px;
-    padding-top: 4px;
+    padding: 16px;
+}
+.cc-builder-actions .btn-secondary,
+.cc-builder-actions .btn-primary {
+    flex: 1;
+    padding: 14px 10px;
+    font-size: 14px;
+    font-weight: 700;
+    border-radius: 14px;
 }
 .cc-builder-actions .btn-secondary,
 .cc-builder-actions .btn-primary {
@@ -4927,14 +4942,22 @@ body {
     color: #fff;
 }
 
-/* Card builder modal — proper contained scrollable box */
+/* Card builder — full-height bottom sheet */
+.cc-modal {
+    align-items: flex-end !important;
+    padding: 0 !important;
+}
+
 .cc-modal-content {
-    max-height: 92vh;
+    width: 100%;
+    max-width: 100%;
+    max-height: 94vh;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     display: flex;
     flex-direction: column;
-    border-radius: 20px;
+    border-radius: 24px 24px 0 0;
+    animation: slideUp 0.3s ease !important;
 }
 
 .cc-modal .modal-body {
