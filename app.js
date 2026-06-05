@@ -4162,7 +4162,7 @@ function refreshCardPreview() {
                 ${title}
             </div>
             <div class="cc-card-name" style="color:${theme.text}">${user.name}</div>
-            <div class="cc-card-hundred" style="color:${theme.text}">💯 100 Days Done</div>
+            <div class="cc-card-hundred" style="color:${theme.text}">💯 CENTURY DONE</div>
             <div class="cc-card-proud" style="color:${theme.accent || theme.text};background:rgba(0,0,0,0.18)">"${proudMoment}"</div>
             <div class="cc-card-stats" style="border-top:1px solid rgba(255,255,255,0.25)">
                 <div class="cc-card-stat"><span class="cc-card-stat-num">${total}</span><span class="cc-card-stat-lbl">Workouts</span></div>
