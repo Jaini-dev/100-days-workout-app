@@ -795,6 +795,99 @@
         </div>
     </div>
 
+    <!-- Century Club Celebration Overlay -->
+    <canvas id="confetti-canvas" class="confetti-canvas"></canvas>
+    <div id="century-club-overlay" class="century-club-overlay">
+        <div class="cc-cel-box">
+            <div class="cc-cel-glow"></div>
+            <div class="cc-cel-emoji">💯</div>
+            <div class="cc-cel-badge">CENTURY CLUB</div>
+            <h1 class="cc-cel-title">YOU DID IT,<br><span id="cc-cel-name">Legend</span>!</h1>
+            <p class="cc-cel-sub">100 workouts completed. You're officially unstoppable.</p>
+            <div class="cc-cel-stats">
+                <div class="cc-cel-stat"><span id="cc-cel-workouts">100</span><small>Workouts</small></div>
+                <div class="cc-cel-stat"><span id="cc-cel-streak">0</span><small>Day Streak</small></div>
+                <div class="cc-cel-stat"><span id="cc-cel-rate">0%</span><small>Consistency</small></div>
+            </div>
+            <button class="cc-cel-btn-primary" onclick="openCardBuilder()">🎨 Build My Card</button>
+            <button class="cc-cel-btn-secondary" onclick="closeCenturyOverlay()">Maybe later</button>
+        </div>
+    </div>
+
+    <!-- Card Builder Modal -->
+    <div id="card-builder-modal" class="modal cc-modal">
+        <div class="modal-header">
+            <h3 class="modal-title">✨ Build Your Card</h3>
+            <button class="modal-close" onclick="closeModal('card-builder-modal')">×</button>
+        </div>
+        <div class="modal-body cc-builder-body">
+            <!-- Live card preview -->
+            <div id="cc-card-preview" class="cc-card-preview"></div>
+
+            <!-- Photo upload -->
+            <div class="cc-builder-section">
+                <label class="cc-builder-label">📸 Add Your Photo</label>
+                <label class="cc-photo-upload-btn">
+                    Drop a photo in
+                    <input type="file" accept="image/*" onchange="handleCenturyPhoto(this)" style="display:none">
+                </label>
+            </div>
+
+            <!-- Proud moment -->
+            <div class="cc-builder-section">
+                <label class="cc-builder-label">🏅 One thing you're most proud of</label>
+                <input id="cc-proud-input" class="cc-proud-input" type="text"
+                    maxlength="80" placeholder="e.g. Never missed a Monday!"
+                    oninput="refreshCardPreview()">
+            </div>
+
+            <!-- Warrior title -->
+            <div class="cc-builder-section">
+                <label class="cc-builder-label">⚡ Pick your title</label>
+                <div class="cc-title-pills">
+                    <div class="cc-title-pill selected" data-title="💪 The Ironclad" onclick="selectCCTitle(this)">💪 The Ironclad</div>
+                    <div class="cc-title-pill" data-title="🔥 The Unstoppable" onclick="selectCCTitle(this)">🔥 The Unstoppable</div>
+                    <div class="cc-title-pill" data-title="🌅 The Dawn Warrior" onclick="selectCCTitle(this)">🌅 The Dawn Warrior</div>
+                    <div class="cc-title-pill" data-title="🦁 The Silent Beast" onclick="selectCCTitle(this)">🦁 The Silent Beast</div>
+                    <div class="cc-title-pill" data-title="⚡ The Everyday Hero" onclick="selectCCTitle(this)">⚡ The Everyday Hero</div>
+                    <div class="cc-title-pill" data-title="🏆 The Legend" onclick="selectCCTitle(this)">🏆 The Legend</div>
+                </div>
+            </div>
+
+            <!-- Theme picker -->
+            <div class="cc-builder-section">
+                <label class="cc-builder-label">🎨 Choose your vibe</label>
+                <div class="cc-theme-dots">
+                    <div class="cc-theme-dot selected" data-theme="cosmic" onclick="selectCCTheme(this)" style="background:linear-gradient(135deg,#667eea,#764ba2)" title="Cosmic"></div>
+                    <div class="cc-theme-dot" data-theme="fire" onclick="selectCCTheme(this)" style="background:linear-gradient(135deg,#f7971e,#ffd200)" title="Fire"></div>
+                    <div class="cc-theme-dot" data-theme="ocean" onclick="selectCCTheme(this)" style="background:linear-gradient(135deg,#2193b0,#6dd5ed)" title="Ocean"></div>
+                    <div class="cc-theme-dot" data-theme="jungle" onclick="selectCCTheme(this)" style="background:linear-gradient(135deg,#11998e,#38ef7d)" title="Jungle"></div>
+                    <div class="cc-theme-dot" data-theme="sunset" onclick="selectCCTheme(this)" style="background:linear-gradient(135deg,#f953c6,#b91d73)" title="Sunset"></div>
+                </div>
+            </div>
+
+            <div class="cc-builder-actions">
+                <button class="btn-secondary" onclick="shareCenturyCard()">📤 Share Text</button>
+                <button class="btn-primary" onclick="saveCenturyCard()">🏆 Save to Hall of Fame</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hall of Fame Screen -->
+    <div id="halloffame-screen" class="screen">
+        <div class="hof-header">
+            <div class="hof-header-bg"></div>
+            <div class="hof-header-content">
+                <div class="hof-header-icon">🏆</div>
+                <h1 class="hof-header-title">Hall of Fame</h1>
+                <p class="hof-header-sub">The ones who made it. <span id="halloffame-count">0</span> legends strong.</p>
+            </div>
+        </div>
+        <div class="hof-body">
+            <div id="halloffame-container" class="hof-grid"></div>
+        </div>
+    </div>
+
     <!-- Hamburger Menu Button -->
     <button class="hamburger-btn" id="hamburger-btn" onclick="toggleSidebar()">
         <span class="hamburger-line"></span>
@@ -832,6 +925,10 @@
             <a href="#" class="sidebar-item" data-tab="summary" onclick="sidebarNav(event, 'summary')">
                 <span class="sidebar-icon">📊</span>
                 <span class="sidebar-text">Share Progress</span>
+            </a>
+            <a href="#" class="sidebar-item" data-tab="halloffame" onclick="sidebarNav(event, 'halloffame')">
+                <span class="sidebar-icon">🏆</span>
+                <span class="sidebar-text">Hall of Fame</span>
             </a>
             <a href="#" class="sidebar-item" data-tab="admin" id="sidebar-admin-item" style="display: none;" onclick="sidebarNav(event, 'admin')">
                 <span class="sidebar-icon">👑</span>

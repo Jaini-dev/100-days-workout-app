@@ -833,6 +833,10 @@ function showTab(tab) {
             showScreen('participants-screen');
             renderParticipantsScreen();
             break;
+        case 'halloffame':
+            showScreen('halloffame-screen');
+            renderHallOfFame();
+            break;
     }
 }
 
@@ -1792,6 +1796,10 @@ async function submitCheckin(status, dateStr = null) {
 
     if (!dateStr) {
         showCelebration(status);
+    }
+
+    if (status === 'Y') {
+        setTimeout(() => checkCenturyClubUnlock(), 600);
     }
 
     setTimeout(() => {
@@ -3926,3 +3934,330 @@ window.refreshSummary = refreshSummary;
 window.refreshDashboard = refreshDashboard;
 window.renderAdminDashboard = renderAdminDashboard;
 // Demo data removed - cloud sync only
+
+// ============================================
+// CENTURY CLUB — 100 days celebration
+// ============================================
+
+let _confettiFrame = null;
+let _confettiParticles = [];
+
+function checkCenturyClubUnlock() {
+    const user = appState.currentUser;
+    if (!user) return;
+    const total = calculateTotalWorkouts(user);
+    if (total < 100) return;
+
+    // Only pop once — if they already have the club data, skip
+    if (user.centuryClub && user.centuryClub.unlockedAt) return;
+
+    // Mark unlocked
+    if (!user.centuryClub) user.centuryClub = {};
+    user.centuryClub.unlockedAt = new Date().toISOString();
+    user.centuryClub.cardClaimed = false;
+
+    const idx = appState.participants.findIndex(p => p.phone === user.phone);
+    if (idx >= 0) appState.participants[idx].centuryClub = user.centuryClub;
+    saveData();
+
+    showCenturyClubCelebration();
+}
+
+function showCenturyClubCelebration() {
+    const user = appState.currentUser;
+    if (!user) return;
+
+    const total = calculateTotalWorkouts(user);
+    const streak = calculateStreak(user);
+    const currentDay = getCurrentDay();
+    const rate = currentDay > 0 ? Math.round((total / currentDay) * 100) : 0;
+
+    $('cc-cel-name').textContent = user.name.split(' ')[0];
+    $('cc-cel-workouts').textContent = total;
+    $('cc-cel-streak').textContent = streak;
+    $('cc-cel-rate').textContent = rate + '%';
+
+    const overlay = $('century-club-overlay');
+    overlay.classList.add('active');
+
+    startConfetti();
+    setTimeout(stopConfetti, 6000);
+}
+
+function closeCenturyOverlay() {
+    $('century-club-overlay').classList.remove('active');
+    stopConfetti();
+}
+
+function startConfetti() {
+    const canvas = $('confetti-canvas');
+    if (!canvas) return;
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const ctx = canvas.getContext('2d');
+
+    const colors = ['#f97316','#6366f1','#22c55e','#eab308','#ec4899','#06b6d4','#a855f7','#ef4444'];
+    _confettiParticles = Array.from({ length: 120 }, () => ({
+        x: Math.random() * canvas.width,
+        y: Math.random() * -canvas.height,
+        w: 6 + Math.random() * 9,
+        h: 4 + Math.random() * 6,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        rot: Math.random() * Math.PI * 2,
+        vx: (Math.random() - 0.5) * 3,
+        vy: 2 + Math.random() * 4,
+        vr: (Math.random() - 0.5) * 0.15,
+    }));
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        _confettiParticles.forEach(p => {
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.rot);
+            ctx.fillStyle = p.color;
+            ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+            ctx.restore();
+            p.x += p.vx;
+            p.y += p.vy;
+            p.rot += p.vr;
+            if (p.y > canvas.height) {
+                p.y = -20;
+                p.x = Math.random() * canvas.width;
+            }
+        });
+        _confettiFrame = requestAnimationFrame(draw);
+    }
+    draw();
+}
+
+function stopConfetti() {
+    if (_confettiFrame) {
+        cancelAnimationFrame(_confettiFrame);
+        _confettiFrame = null;
+    }
+    const canvas = $('confetti-canvas');
+    if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+}
+
+// ---- Card Builder ----
+
+const CENTURY_THEMES = {
+    cosmic:  { label: 'Cosmic',  grad: 'linear-gradient(135deg,#667eea,#764ba2)', text: '#fff', accent: '#e9d5ff' },
+    fire:    { label: 'Fire',    grad: 'linear-gradient(135deg,#f7971e,#ffd200)', text: '#1a1a1a', accent: '#7c2d12' },
+    ocean:   { label: 'Ocean',   grad: 'linear-gradient(135deg,#2193b0,#6dd5ed)', text: '#fff', accent: '#e0f7fa' },
+    jungle:  { label: 'Jungle',  grad: 'linear-gradient(135deg,#11998e,#38ef7d)', text: '#fff', accent: '#d1fae5' },
+    sunset:  { label: 'Sunset',  grad: 'linear-gradient(135deg,#f953c6,#b91d73)', text: '#fff', accent: '#fce7f3' },
+};
+
+const CENTURY_TITLES = [
+    '💪 The Ironclad',
+    '🔥 The Unstoppable',
+    '🌅 The Dawn Warrior',
+    '🦁 The Silent Beast',
+    '⚡ The Everyday Hero',
+    '🏆 The Legend',
+];
+
+let _cardPhotoDataUrl = null;
+
+function openCardBuilder() {
+    closeCenturyOverlay();
+    const user = appState.currentUser;
+    const existing = user.centuryClub || {};
+
+    // Restore saved choices if any
+    _cardPhotoDataUrl = existing.photo || null;
+
+    const input = $('cc-proud-input');
+    if (input) input.value = existing.proudMoment || '';
+
+    // Set theme
+    const savedTheme = existing.theme || 'cosmic';
+    document.querySelectorAll('.cc-theme-dot').forEach(el => {
+        el.classList.toggle('selected', el.dataset.theme === savedTheme);
+    });
+
+    // Set title
+    const savedTitle = existing.title || CENTURY_TITLES[5];
+    document.querySelectorAll('.cc-title-pill').forEach(el => {
+        el.classList.toggle('selected', el.dataset.title === savedTitle);
+    });
+
+    refreshCardPreview();
+    openModal('card-builder-modal');
+}
+
+function handleCenturyPhoto(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        _cardPhotoDataUrl = e.target.result;
+        refreshCardPreview();
+    };
+    reader.readAsDataURL(file);
+}
+
+function getSelectedTheme() {
+    const el = document.querySelector('.cc-theme-dot.selected');
+    return (el && el.dataset.theme) ? el.dataset.theme : 'cosmic';
+}
+
+function getSelectedTitle() {
+    const el = document.querySelector('.cc-title-pill.selected');
+    return (el && el.dataset.title) ? el.dataset.title : CENTURY_TITLES[5];
+}
+
+function selectCCTheme(dot) {
+    document.querySelectorAll('.cc-theme-dot').forEach(d => d.classList.remove('selected'));
+    dot.classList.add('selected');
+    refreshCardPreview();
+}
+
+function selectCCTitle(pill) {
+    document.querySelectorAll('.cc-title-pill').forEach(p => p.classList.remove('selected'));
+    pill.classList.add('selected');
+    refreshCardPreview();
+}
+
+function refreshCardPreview() {
+    const user = appState.currentUser;
+    if (!user) return;
+
+    const theme = CENTURY_THEMES[getSelectedTheme()] || CENTURY_THEMES.cosmic;
+    const title = getSelectedTitle();
+    const proudMoment = ($('cc-proud-input') && $('cc-proud-input').value.trim()) || '100 days of showing up!';
+    const total = calculateTotalWorkouts(user);
+    const streak = calculateStreak(user);
+    const currentDay = getCurrentDay();
+    const rate = currentDay > 0 ? Math.round((total / currentDay) * 100) : 0;
+
+    const photoHTML = _cardPhotoDataUrl
+        ? `<img src="${_cardPhotoDataUrl}" class="cc-card-photo" alt="photo">`
+        : `<div class="cc-card-photo cc-card-photo-placeholder">😤</div>`;
+
+    const card = $('cc-card-preview');
+    if (!card) return;
+
+    card.style.background = theme.grad;
+    card.style.color = theme.text;
+    card.innerHTML = `
+        <div class="cc-card-watermark">💯</div>
+        <div class="cc-card-inner">
+            ${photoHTML}
+            <div class="cc-card-badge" style="color:${theme.text};border-color:${theme.accent};background:rgba(255,255,255,0.18)">
+                ${title}
+            </div>
+            <div class="cc-card-name" style="color:${theme.text}">${user.name}</div>
+            <div class="cc-card-hundred" style="color:${theme.text}">💯 100 Days Done</div>
+            <div class="cc-card-proud" style="color:${theme.accent || theme.text};background:rgba(0,0,0,0.18)">"${proudMoment}"</div>
+            <div class="cc-card-stats" style="border-top:1px solid rgba(255,255,255,0.25)">
+                <div class="cc-card-stat"><span class="cc-card-stat-num">${total}</span><span class="cc-card-stat-lbl">Workouts</span></div>
+                <div class="cc-card-stat"><span class="cc-card-stat-num">${streak}</span><span class="cc-card-stat-lbl">Day Streak</span></div>
+                <div class="cc-card-stat"><span class="cc-card-stat-num">${rate}%</span><span class="cc-card-stat-lbl">Consistency</span></div>
+            </div>
+            <div class="cc-card-footer" style="color:${theme.accent || theme.text}">100 Days Workout · ${challengeSettings.seasonName}</div>
+        </div>
+    `;
+}
+
+function saveCenturyCard() {
+    const user = appState.currentUser;
+    if (!user) return;
+
+    const proudMoment = ($('cc-proud-input') && $('cc-proud-input').value.trim()) || '';
+    if (!user.centuryClub) user.centuryClub = {};
+
+    user.centuryClub.photo = _cardPhotoDataUrl || null;
+    user.centuryClub.proudMoment = proudMoment;
+    user.centuryClub.title = getSelectedTitle();
+    user.centuryClub.theme = getSelectedTheme();
+    user.centuryClub.cardClaimed = true;
+
+    const idx = appState.participants.findIndex(p => p.phone === user.phone);
+    if (idx >= 0) appState.participants[idx].centuryClub = user.centuryClub;
+    saveData();
+
+    closeModal('card-builder-modal');
+    showToast('Your card is saved! Check the Hall of Fame 🏆', 'success');
+    showTab('halloffame');
+}
+
+function shareCenturyCard() {
+    const user = appState.currentUser;
+    if (!user) return;
+    const total = calculateTotalWorkouts(user);
+    const streak = calculateStreak(user);
+    const proudMoment = (user.centuryClub && user.centuryClub.proudMoment) ? `"${user.centuryClub.proudMoment}"` : '';
+    const title = (user.centuryClub && user.centuryClub.title) ? user.centuryClub.title : '';
+
+    const text = `💯 I just completed 100 days of workouts!\n\n${title}\n\n${proudMoment}\n\n🏋️ ${total} workouts · 🔥 ${streak} day streak\n\n#100DaysWorkout #CenturyClub #${challengeSettings.seasonName.replace(' ', '')}`;
+
+    if (navigator.share) {
+        navigator.share({ text }).catch(() => {});
+    } else {
+        navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard! 📋', 'success'));
+    }
+}
+
+// ---- Hall of Fame ----
+
+function renderHallOfFame() {
+    const container = $('halloffame-container');
+    if (!container) return;
+
+    const completers = appState.participants.filter(p =>
+        calculateTotalWorkouts(p) >= 100
+    ).sort((a, b) => {
+        const aDate = a.centuryClub?.unlockedAt || '';
+        const bDate = b.centuryClub?.unlockedAt || '';
+        return aDate.localeCompare(bDate);
+    });
+
+    $('halloffame-count').textContent = completers.length;
+
+    if (completers.length === 0) {
+        container.innerHTML = `
+            <div class="hof-empty">
+                <div class="hof-empty-icon">🏆</div>
+                <h3>No one yet — be the first!</h3>
+                <p>Complete 100 workouts to join the Century Club and have your card displayed here.</p>
+            </div>`;
+        return;
+    }
+
+    container.innerHTML = completers.map((p, i) => {
+        const club = p.centuryClub || {};
+        const theme = CENTURY_THEMES[club.theme || 'cosmic'] || CENTURY_THEMES.cosmic;
+        const total = calculateTotalWorkouts(p);
+        const streak = calculateStreak(p);
+        const proudMoment = club.proudMoment || '100 days of showing up!';
+        const title = club.title || '🏆 The Legend';
+        const photoHTML = club.photo
+            ? `<img src="${club.photo}" class="hof-card-photo" alt="">`
+            : `<div class="hof-card-photo hof-card-photo-placeholder">😤</div>`;
+        const completedDate = club.unlockedAt
+            ? new Date(club.unlockedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+            : '';
+        const rankLabel = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`;
+
+        return `
+            <div class="hof-card" style="background:${theme.grad};color:${theme.text}">
+                <div class="hof-card-rank">${rankLabel}</div>
+                <div class="hof-card-watermark">💯</div>
+                ${photoHTML}
+                <div class="hof-card-badge" style="border-color:rgba(255,255,255,0.4);color:${theme.text}">${title}</div>
+                <div class="hof-card-name">${p.name}</div>
+                <div class="hof-card-proud">"${proudMoment}"</div>
+                <div class="hof-card-stats">
+                    <span>🏋️ ${total}</span>
+                    <span>🔥 ${streak}d</span>
+                </div>
+                ${completedDate ? `<div class="hof-card-date">${completedDate}</div>` : ''}
+            </div>`;
+    }).join('');
+}

@@ -4342,3 +4342,524 @@ body {
     background: var(--gray-100);
     color: var(--gray-400);
 }
+
+/* ============================================
+   CENTURY CLUB — Confetti, Celebration,
+   Card Builder, Hall of Fame
+   ============================================ */
+
+/* Confetti canvas — sits above everything */
+.confetti-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    pointer-events: none;
+    display: none;
+}
+#century-club-overlay.active ~ canvas,
+.confetti-canvas { display: block; }
+
+/* Century Club full-screen celebration overlay */
+.century-club-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1300;
+    background: rgba(0,0,0,0.85);
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    overflow-y: auto;
+}
+.century-club-overlay.active { display: flex; }
+
+.cc-cel-box {
+    position: relative;
+    background: linear-gradient(145deg, #1a1a2e, #16213e, #0f3460);
+    border-radius: 28px;
+    padding: 40px 28px 32px;
+    max-width: 360px;
+    width: 100%;
+    text-align: center;
+    color: #fff;
+    box-shadow: 0 0 60px rgba(99,102,241,0.5), 0 0 120px rgba(139,92,246,0.2);
+    border: 1px solid rgba(255,255,255,0.12);
+    overflow: hidden;
+}
+
+.cc-cel-glow {
+    position: absolute;
+    inset: -40px;
+    background: radial-gradient(ellipse at center, rgba(99,102,241,0.35) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.cc-cel-emoji {
+    font-size: 72px;
+    line-height: 1;
+    margin-bottom: 8px;
+    animation: cc-pop 0.6s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+@keyframes cc-pop {
+    0%   { transform: scale(0) rotate(-20deg); opacity: 0; }
+    100% { transform: scale(1) rotate(0deg);   opacity: 1; }
+}
+
+.cc-cel-badge {
+    display: inline-block;
+    background: linear-gradient(90deg,#f7971e,#ffd200);
+    color: #1a1a1a;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 2.5px;
+    padding: 4px 14px;
+    border-radius: 50px;
+    margin-bottom: 16px;
+}
+
+.cc-cel-title {
+    font-size: 28px;
+    font-weight: 900;
+    line-height: 1.2;
+    margin-bottom: 10px;
+    background: linear-gradient(90deg,#fff,#c4b5fd);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.cc-cel-sub {
+    font-size: 14px;
+    color: rgba(255,255,255,0.7);
+    margin-bottom: 24px;
+    line-height: 1.5;
+}
+
+.cc-cel-stats {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-bottom: 28px;
+}
+
+.cc-cel-stat {
+    flex: 1;
+    background: rgba(255,255,255,0.1);
+    border-radius: 14px;
+    padding: 12px 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.cc-cel-stat span {
+    font-size: 22px;
+    font-weight: 800;
+    color: #ffd200;
+}
+
+.cc-cel-stat small {
+    font-size: 10px;
+    color: rgba(255,255,255,0.6);
+    letter-spacing: 0.5px;
+}
+
+.cc-cel-btn-primary {
+    width: 100%;
+    padding: 14px;
+    border-radius: 14px;
+    border: none;
+    background: linear-gradient(90deg,#6366f1,#8b5cf6);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-bottom: 10px;
+    letter-spacing: 0.3px;
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 4px 20px rgba(99,102,241,0.5);
+}
+.cc-cel-btn-primary:active { transform: scale(0.97); }
+
+.cc-cel-btn-secondary {
+    width: 100%;
+    padding: 10px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: transparent;
+    color: rgba(255,255,255,0.5);
+    font-size: 13px;
+    cursor: pointer;
+}
+
+/* Card builder modal */
+.cc-modal .modal-body { padding: 0; }
+
+.cc-builder-body {
+    padding: 16px 16px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Live card preview */
+.cc-card-preview {
+    border-radius: 20px;
+    overflow: hidden;
+    min-height: 320px;
+    position: relative;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+    flex-shrink: 0;
+}
+
+.cc-card-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 28px 20px 20px;
+    gap: 10px;
+    position: relative;
+    z-index: 1;
+}
+
+.cc-card-watermark {
+    position: absolute;
+    top: -10px;
+    right: 10px;
+    font-size: 100px;
+    opacity: 0.08;
+    pointer-events: none;
+    user-select: none;
+    line-height: 1;
+    z-index: 0;
+}
+
+.cc-card-photo, .hof-card-photo {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid rgba(255,255,255,0.6);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.cc-card-photo-placeholder, .hof-card-photo-placeholder {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    border: 3px solid rgba(255,255,255,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+}
+
+.cc-card-badge {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 4px 12px;
+    border-radius: 50px;
+    border: 1px solid;
+}
+
+.cc-card-name {
+    font-size: 22px;
+    font-weight: 900;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    text-align: center;
+}
+
+.cc-card-hundred {
+    font-size: 18px;
+    font-weight: 800;
+    opacity: 0.95;
+}
+
+.cc-card-proud {
+    font-size: 13px;
+    font-style: italic;
+    text-align: center;
+    border-radius: 10px;
+    padding: 8px 12px;
+    line-height: 1.5;
+    max-width: 100%;
+}
+
+.cc-card-stats {
+    display: flex;
+    gap: 6px;
+    width: 100%;
+    justify-content: space-around;
+    padding-top: 10px;
+    margin-top: 4px;
+}
+
+.cc-card-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.cc-card-stat-num {
+    font-size: 20px;
+    font-weight: 900;
+}
+
+.cc-card-stat-lbl {
+    font-size: 9px;
+    opacity: 0.75;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.cc-card-footer {
+    font-size: 10px;
+    opacity: 0.6;
+    letter-spacing: 0.5px;
+    text-align: center;
+}
+
+/* Builder UI */
+.cc-builder-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cc-builder-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-700);
+}
+
+.cc-photo-upload-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: 2px dashed var(--gray-300);
+    color: var(--gray-500);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+    align-self: flex-start;
+}
+.cc-photo-upload-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+.cc-proud-input {
+    width: 100%;
+    padding: 11px 14px;
+    border: 1.5px solid var(--gray-200);
+    border-radius: 10px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+}
+.cc-proud-input:focus { border-color: var(--primary); }
+
+.cc-title-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.cc-title-pill {
+    padding: 7px 14px;
+    border-radius: 50px;
+    border: 2px solid var(--gray-200);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: var(--gray-600);
+    background: var(--gray-50);
+    white-space: nowrap;
+}
+.cc-title-pill.selected {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: #fff;
+}
+
+.cc-theme-dots {
+    display: flex;
+    gap: 12px;
+}
+
+.cc-theme-dot {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 3px solid transparent;
+    transition: transform 0.15s, border-color 0.15s;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.cc-theme-dot.selected {
+    border-color: var(--gray-800);
+    transform: scale(1.2);
+}
+
+.cc-builder-actions {
+    display: flex;
+    gap: 10px;
+    padding-top: 4px;
+}
+.cc-builder-actions .btn-secondary,
+.cc-builder-actions .btn-primary {
+    flex: 1;
+    padding: 12px;
+    font-size: 14px;
+}
+
+/* Hall of Fame screen */
+.hof-header {
+    position: relative;
+    overflow: hidden;
+    padding: 56px 20px 40px;
+    text-align: center;
+}
+
+.hof-header-bg {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    z-index: 0;
+}
+
+.hof-header-content {
+    position: relative;
+    z-index: 1;
+    color: #fff;
+}
+
+.hof-header-icon {
+    font-size: 52px;
+    margin-bottom: 8px;
+    animation: cc-pop 0.6s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+.hof-header-title {
+    font-size: 32px;
+    font-weight: 900;
+    background: linear-gradient(90deg, #ffd200, #f7971e);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 6px;
+}
+
+.hof-header-sub {
+    color: rgba(255,255,255,0.65);
+    font-size: 14px;
+}
+
+.hof-body {
+    padding: 24px 16px 40px;
+    background: var(--gray-100);
+    min-height: 50vh;
+}
+
+.hof-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.hof-card {
+    border-radius: 20px;
+    overflow: hidden;
+    padding: 20px 14px 16px;
+    position: relative;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+    animation: cc-pop 0.4s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+.hof-card-watermark {
+    position: absolute;
+    top: -8px;
+    right: 6px;
+    font-size: 60px;
+    opacity: 0.07;
+    pointer-events: none;
+    user-select: none;
+    line-height: 1;
+}
+
+.hof-card-rank {
+    position: absolute;
+    top: 10px;
+    left: 12px;
+    font-size: 16px;
+    font-weight: 800;
+}
+
+.hof-card-photo {
+    width: 64px;
+    height: 64px;
+}
+.hof-card-photo-placeholder {
+    width: 64px;
+    height: 64px;
+    font-size: 28px;
+}
+
+.hof-card-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 50px;
+    border: 1px solid;
+    letter-spacing: 0.3px;
+}
+
+.hof-card-name {
+    font-size: 15px;
+    font-weight: 800;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.hof-card-proud {
+    font-size: 11px;
+    font-style: italic;
+    opacity: 0.85;
+    line-height: 1.4;
+    text-align: center;
+}
+
+.hof-card-stats {
+    display: flex;
+    gap: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    opacity: 0.9;
+}
+
+.hof-card-date {
+    font-size: 10px;
+    opacity: 0.6;
+    letter-spacing: 0.3px;
+}
+
+.hof-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--gray-500);
+}
+.hof-empty-icon { font-size: 56px; margin-bottom: 16px; }
+.hof-empty h3 { font-size: 18px; color: var(--gray-700); margin-bottom: 8px; }
+.hof-empty p  { font-size: 14px; line-height: 1.6; }
