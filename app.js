@@ -1462,6 +1462,12 @@ function updateDashboard() {
     const user = appState.currentUser;
     if (!user) return;
 
+    // Show Century Club celebration to users who already had 100+ workouts
+    // before this feature existed (fires once, then centuryClub.unlockedAt is set).
+    if (calculateTotalWorkouts(user) >= 100 && !user.centuryClub?.unlockedAt) {
+        setTimeout(checkCenturyClubUnlock, 1500);
+    }
+
     const currentDay = getCurrentDay();
     const daysLeft = getDaysLeft();
 
@@ -4053,14 +4059,29 @@ const CENTURY_THEMES = {
     sunset:  { label: 'Sunset',  grad: 'linear-gradient(135deg,#f953c6,#b91d73)', text: '#fff', accent: '#fce7f3' },
 };
 
-const CENTURY_TITLES = [
-    '💪 The Ironclad',
-    '🔥 The Unstoppable',
-    '🌅 The Dawn Warrior',
-    '🦁 The Silent Beast',
-    '⚡ The Everyday Hero',
-    '🏆 The Legend',
-];
+function assignCenturyTitle(user) {
+    const checkins = user.checkins || {};
+    const vals = Object.values(checkins);
+    const total = vals.filter(v => v === 'Y').length;
+    const restDays = vals.filter(v => v === 'R').length;
+    const missedDays = vals.filter(v => v === 'N').length;
+    const streak = calculateStreak(user);
+    const currentDay = getCurrentDay();
+    const rate = currentDay > 0 ? Math.round((total / currentDay) * 100) : 0;
+
+    if (restDays === 0 && missedDays === 0)    return "Zero Days Off. Literally. 💀";
+    if (total >= 130)                           return "Overachiever (Shocker) 🙄";
+    if (streak >= 50)                           return "We're a Little Scared of You 😳";
+    if (streak >= 30)                           return "The Streak Was Unreal 🚀";
+    if (rate >= 92)                             return "Suspiciously Consistent 👀";
+    if (missedDays === 0 && restDays === 0)     return "Exactly 100. Not One More. 😌";
+    if (restDays === 0)                         return "Rest Days? Never Heard of 'Em 😤";
+    if (missedDays >= 40)                       return "The Comeback Arc Was REAL 🔥";
+    if (rate < 60)                              return "Chaos Theory Actually Works 🤷";
+    if (restDays > 25)                          return "Work-Life Balance Understood 😌";
+    if (total >= 110)                           return "Couldn't Stop at 100, Could You 😅";
+    return "Showed Up Every Single Time 🫡";
+}
 
 let _cardPhotoDataUrl = null;
 
@@ -4069,7 +4090,6 @@ function openCardBuilder() {
     const user = appState.currentUser;
     const existing = user.centuryClub || {};
 
-    // Restore saved choices if any
     _cardPhotoDataUrl = existing.photo || null;
 
     const input = $('cc-proud-input');
@@ -4081,11 +4101,9 @@ function openCardBuilder() {
         el.classList.toggle('selected', el.dataset.theme === savedTheme);
     });
 
-    // Set title
-    const savedTitle = existing.title || CENTURY_TITLES[5];
-    document.querySelectorAll('.cc-title-pill').forEach(el => {
-        el.classList.toggle('selected', el.dataset.title === savedTitle);
-    });
+    // Show auto-assigned title
+    const titleEl = $('cc-assigned-title');
+    if (titleEl) titleEl.textContent = assignCenturyTitle(user);
 
     refreshCardPreview();
     openModal('card-builder-modal');
@@ -4107,20 +4125,9 @@ function getSelectedTheme() {
     return (el && el.dataset.theme) ? el.dataset.theme : 'cosmic';
 }
 
-function getSelectedTitle() {
-    const el = document.querySelector('.cc-title-pill.selected');
-    return (el && el.dataset.title) ? el.dataset.title : CENTURY_TITLES[5];
-}
-
 function selectCCTheme(dot) {
     document.querySelectorAll('.cc-theme-dot').forEach(d => d.classList.remove('selected'));
     dot.classList.add('selected');
-    refreshCardPreview();
-}
-
-function selectCCTitle(pill) {
-    document.querySelectorAll('.cc-title-pill').forEach(p => p.classList.remove('selected'));
-    pill.classList.add('selected');
     refreshCardPreview();
 }
 
@@ -4129,7 +4136,7 @@ function refreshCardPreview() {
     if (!user) return;
 
     const theme = CENTURY_THEMES[getSelectedTheme()] || CENTURY_THEMES.cosmic;
-    const title = getSelectedTitle();
+    const title = assignCenturyTitle(user);
     const proudMoment = ($('cc-proud-input') && $('cc-proud-input').value.trim()) || '100 days of showing up!';
     const total = calculateTotalWorkouts(user);
     const streak = calculateStreak(user);
@@ -4174,7 +4181,7 @@ function saveCenturyCard() {
 
     user.centuryClub.photo = _cardPhotoDataUrl || null;
     user.centuryClub.proudMoment = proudMoment;
-    user.centuryClub.title = getSelectedTitle();
+    user.centuryClub.title = assignCenturyTitle(user);
     user.centuryClub.theme = getSelectedTheme();
     user.centuryClub.cardClaimed = true;
 

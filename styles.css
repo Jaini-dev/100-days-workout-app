@@ -4863,3 +4863,16 @@ body {
 .hof-empty-icon { font-size: 56px; margin-bottom: 16px; }
 .hof-empty h3 { font-size: 18px; color: var(--gray-700); margin-bottom: 8px; }
 .hof-empty p  { font-size: 14px; line-height: 1.6; }
+
+/* Auto-assigned title display */
+.cc-auto-title {
+    display: inline-block;
+    padding: 10px 18px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff;
+    border-radius: 50px;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    box-shadow: 0 4px 14px rgba(99,102,241,0.35);
+}
