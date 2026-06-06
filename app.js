@@ -4396,7 +4396,7 @@ function ccTplPop(ctx, W, H, d) {
     ctx.fillText(bannerTxt, cx, by + bh/2 + 2);
     ctx.restore();
 
-    const cy = 330, r = 135;
+    const cy = 340, r = 172;
     ctx.save();
     ctx.beginPath(); ctx.arc(cx, cy, r + 14, 0, Math.PI*2);
     ctx.fillStyle = dark ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.35)';
@@ -4476,7 +4476,7 @@ function ccTplBold(ctx, W, H, d) {
     ctx.font = '800 30px ' + font;
     ctx.fillText('★  THE CENTURY CLUB  ★', cx, 140);
 
-    ccDrawCirclePhoto(ctx, cx, 330, 120, dark?'rgba(0,0,0,0.4)':'#ffffff', 8, dark);
+    ccDrawCirclePhoto(ctx, cx, 340, 155, dark?'rgba(0,0,0,0.4)':'#ffffff', 10, dark);
 
     ctx.fillStyle = text;
     const nameSize = ccFitFont(ctx, d.name, '900', 96, 52, W - 200, font);
@@ -4522,41 +4522,53 @@ function ccTplPolaroid(ctx, W, H, d) {
     ccBg(ctx, W, H, d.theme.c1, d.theme.c2, true);
     ctx.textAlign='center'; ctx.textBaseline='middle';
 
-    const px=90, py=120, pw=W-180, ph=1080;
+    const px=80, py=90, pw=W-160, ph=1180;
     ctx.save();
-    ctx.shadowColor='rgba(0,0,0,0.3)'; ctx.shadowBlur=40; ctx.shadowOffsetY=18;
+    ctx.shadowColor='rgba(0,0,0,0.3)'; ctx.shadowBlur=44; ctx.shadowOffsetY=20;
     ccRoundRect(ctx, px, py, pw, ph, 28);
     ctx.fillStyle='#ffffff'; ctx.fill();
     ctx.restore();
 
-    const pad=44;
-    const imgH = Math.round((pw - pad*2) * 0.82);
-    ccDrawRectPhoto(ctx, px+pad, py+pad, pw-pad*2, imgH, 18);
+    const pad=42;
+    const innerW = pw - pad*2;
+    const imgH = Math.round(innerW * 0.74);
+    ccDrawRectPhoto(ctx, px+pad, py+pad, innerW, imgH, 18);
 
-    ctx.save(); ctx.translate(px+34, py+34); ctx.rotate(-0.25); ctx.font='82px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('💯',0,0); ctx.restore();
-    ctx.save(); ctx.translate(px+pw-34, py+38); ctx.rotate(0.22); ctx.font='70px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🎉',0,0); ctx.restore();
+    // Sticker emojis on the corners
+    ctx.save(); ctx.translate(px+36, py+36); ctx.rotate(-0.25); ctx.font='84px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('💯',0,0); ctx.restore();
+    ctx.save(); ctx.translate(px+pw-36, py+40); ctx.rotate(0.22); ctx.font='72px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🎉',0,0); ctx.restore();
 
+    // Caption (handwritten-ish)
     const capTop = py+pad+imgH;
     ctx.fillStyle='#1f2937';
     ctx.font='italic 700 46px ' + font;
-    const lines = ccWrapLines(ctx, '“'+d.proud+'”', pw-120).slice(0,2);
-    let ty = capTop + 70;
-    lines.forEach(function(ln){ ctx.fillText(ln, cx, ty); ty+=58; });
+    const lines = ccWrapLines(ctx, '“'+d.proud+'”', innerW-20).slice(0,2);
+    let ty = capTop + 64;
+    lines.forEach(function(ln){ ctx.fillText(ln, cx, ty); ty+=56; });
 
+    // Name + subtitle
     ctx.fillStyle='#6d28d9';
-    const ns = ccFitFont(ctx, d.name, '900', 54, 34, pw-140, font);
+    const ns = ccFitFont(ctx, d.name, '900', 52, 32, innerW-20, font);
     ctx.font='900 ' + ns + 'px ' + font;
-    ctx.fillText(d.name, cx, ty+40);
+    ctx.fillText(d.name, cx, ty+34);
     ctx.fillStyle='#9ca3af';
-    ctx.font='700 26px ' + font;
-    ctx.fillText('100 DAYS DONE · ' + d.season.toUpperCase(), cx, ty+96);
+    ctx.font='700 24px ' + font;
+    ctx.fillText('100 DAYS DONE · ' + d.season.toUpperCase(), cx, ty+82);
 
-    const sy = py+ph+62;
-    const cols=[[String(d.total),'🏋️'],[String(d.streak),'🔥'],[d.rate+'%','🎯']];
-    const colX=[W*0.27,W*0.5,W*0.73];
+    // Stats strip INSIDE the card, neatly formatted
+    const stripTop = py + ph - 150;
+    ctx.strokeStyle = '#ececed';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(px+pad, stripTop); ctx.lineTo(px+pw-pad, stripTop); ctx.stroke();
+
+    const cols=[[String(d.total),'WORKOUTS'],[String(d.streak),'DAY STREAK'],[d.rate+'%','CONSISTENCY']];
+    const colX=[px+pw*0.25, px+pw*0.5, px+pw*0.75];
+    // light separators
+    ctx.strokeStyle = '#f1f1f2';
+    [px+pw*0.375, px+pw*0.625].forEach(function(x){ ctx.beginPath(); ctx.moveTo(x, stripTop+30); ctx.lineTo(x, stripTop+110); ctx.stroke(); });
     cols.forEach(function(c,i){
-        ctx.fillStyle=d.theme.text; ctx.font='34px sans-serif'; ctx.fillText(c[1],colX[i],sy);
-        ctx.font='900 52px ' + font; ctx.fillText(c[0],colX[i],sy+56);
+        ctx.fillStyle='#1f2937'; ctx.font='900 56px ' + font; ctx.fillText(c[0], colX[i], stripTop+62);
+        ctx.fillStyle='#9ca3af'; ctx.font='700 21px ' + font; ctx.fillText(c[1], colX[i], stripTop+108);
     });
 }
 
@@ -4578,7 +4590,7 @@ function ccTplTicket(ctx, W, H, d) {
     ctx.font = '800 30px ' + font;
     ctx.fillText('🎟  ADMIT ONE  ·  CENTURY CLUB', cx, tyTop+70);
 
-    ccDrawCirclePhoto(ctx, cx, tyTop+250, 118, dark?'rgba(0,0,0,0.35)':'#ffffff', 8, dark);
+    ccDrawCirclePhoto(ctx, cx, tyTop+255, 150, dark?'rgba(0,0,0,0.35)':'#ffffff', 10, dark);
 
     ctx.fillStyle=text;
     const nameSize=ccFitFont(ctx,d.name,'900',74,46,tw-120,font);
@@ -4641,9 +4653,22 @@ function ccDataURLToBlob(dataUrl) {
     return new Blob([arr], { type: mime });
 }
 
+let _ccSharing = false;
+
 function shareCenturyCard() {
+    if (_ccSharing) return;             // guard against double-taps
     const canvas = $('cc-card-canvas');
     if (!canvas) return;
+
+    const btn = document.querySelector('.cc-share-btn');
+    const orig = btn ? btn.innerHTML : '';
+    _ccSharing = true;
+    if (btn) { btn.innerHTML = '⏳ Opening share…'; btn.style.opacity = '0.75'; }
+    const reset = () => {
+        _ccSharing = false;
+        if (btn) { btn.innerHTML = orig; btn.style.opacity = ''; }
+    };
+
     persistCenturyCard();
 
     let file;
@@ -4652,13 +4677,14 @@ function shareCenturyCard() {
         file = new File([blob], 'my-century-card.png', { type: 'image/png' });
     } catch (e) {
         showToast('Could not generate image', 'error');
+        reset();
         return;
     }
 
     const data = { files: [file], text: ccShareCaption() };
     // Native file share (WhatsApp / Insta share sheet) — must stay in the gesture
     if (navigator.share && (!navigator.canShare || navigator.canShare(data))) {
-        navigator.share(data).catch(() => {});
+        navigator.share(data).catch(() => {}).finally(reset);
         return;
     }
     // Fallbacks
@@ -4667,6 +4693,7 @@ function shareCenturyCard() {
     }
     ccDownloadCanvas(canvas);
     showToast('Image saved — share it on WhatsApp 📲', 'success');
+    reset();
 }
 
 function downloadCenturyCard() {
