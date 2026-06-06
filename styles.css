@@ -5169,3 +5169,29 @@ body.modal-open {
     box-shadow: 0 -8px 18px -10px rgba(0,0,0,0.3);
     padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
 }
+
+/* ============================================
+   CENTURY CLUB — action button fix
+   ============================================ */
+/* Raise the builder above the floating menu button so taps always land */
+.cc-modal { z-index: 1500; }
+
+/* Stack the two actions full-width — big tap targets, no narrow zones */
+.cc-builder-actions {
+    flex-direction: column;
+    gap: 10px;
+}
+.cc-share-btn { width: 100%; }
+.cc-download-btn2 {
+    width: 100%;
+    border: 2px solid var(--gray-200);
+    border-radius: 16px;
+    padding: 15px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--gray-700);
+    background: var(--gray-50);
+    cursor: pointer;
+    transition: transform 0.12s, background 0.15s;
+}
+.cc-download-btn2:active { transform: scale(0.98); background: var(--gray-100); }

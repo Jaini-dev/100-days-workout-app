@@ -3684,6 +3684,9 @@ function lockBodyScroll() {
     _bodyScrollY = window.scrollY || window.pageYOffset || 0;
     document.body.style.top = `-${_bodyScrollY}px`;
     document.body.classList.add('modal-open');
+    // Force-hide the floating menu button so it can't overlap modal controls
+    const hb = $('hamburger-btn');
+    if (hb) hb.style.display = 'none';
 }
 
 function unlockBodyScroll() {
@@ -3691,6 +3694,8 @@ function unlockBodyScroll() {
     document.body.classList.remove('modal-open');
     document.body.style.top = '';
     window.scrollTo(0, _bodyScrollY);
+    const hb = $('hamburger-btn');
+    if (hb) hb.style.display = '';
 }
 
 function openModal(modalId) {
