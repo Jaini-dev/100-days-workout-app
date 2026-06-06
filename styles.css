@@ -4987,3 +4987,106 @@ body {
     justify-content: center;
     backdrop-filter: blur(4px);
 }
+
+/* ============================================
+   CENTURY CLUB — Canvas card + fun builder
+   ============================================ */
+.cc-canvas-wrap {
+    padding: 16px 16px 6px;
+    display: flex;
+    justify-content: center;
+    background: var(--gray-50);
+}
+.cc-card-canvas {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 52vh;
+    border-radius: 22px;
+    box-shadow: 0 14px 44px rgba(0,0,0,0.28);
+}
+
+.cc-fun-form {
+    padding: 12px 18px 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.cc-fun-tip {
+    text-align: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--gray-500);
+    margin: 2px 0 4px;
+}
+
+.cc-fun-photo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 15px 18px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #eef2ff, #faf5ff);
+    border: 2px dashed #c4b5fd;
+    cursor: pointer;
+    transition: transform 0.12s;
+}
+.cc-fun-photo:active { transform: scale(0.98); }
+.cc-fun-photo-emoji { font-size: 28px; }
+.cc-fun-photo-text { font-size: 16px; font-weight: 700; color: #6d28d9; }
+
+.cc-fun-input {
+    width: 100%;
+    padding: 16px 18px;
+    border-radius: 16px;
+    border: 2px solid var(--gray-200);
+    background: var(--gray-50);
+    font-size: 16px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s, background 0.2s;
+}
+.cc-fun-input:focus { border-color: var(--primary); background: #fff; }
+
+.cc-fun-vibe {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 2px;
+}
+.cc-fun-vibe-label { font-size: 15px; font-weight: 700; color: var(--gray-700); }
+.cc-fun-vibe .cc-theme-dots { gap: 10px; }
+.cc-fun-vibe .cc-theme-dot { width: 38px; height: 38px; }
+
+.cc-builder-actions {
+    display: flex;
+    gap: 10px;
+    padding: 14px 16px;
+    align-items: stretch;
+}
+.cc-share-btn {
+    flex: 1;
+    border: none;
+    border-radius: 16px;
+    padding: 17px;
+    font-size: 16px;
+    font-weight: 800;
+    color: #fff;
+    background: linear-gradient(135deg, #25D366, #0f9d6f);
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(37,211,102,0.45);
+    transition: transform 0.12s;
+}
+.cc-share-btn:active { transform: scale(0.97); }
+.cc-download-btn {
+    width: 58px;
+    border: none;
+    border-radius: 16px;
+    font-size: 22px;
+    background: var(--gray-100);
+    cursor: pointer;
+    transition: transform 0.12s;
+}
+.cc-download-btn:active { transform: scale(0.95); }

@@ -4054,11 +4054,11 @@ function stopConfetti() {
 // ---- Card Builder ----
 
 const CENTURY_THEMES = {
-    cosmic:  { label: 'Cosmic',  grad: 'linear-gradient(135deg,#667eea,#764ba2)', text: '#fff', accent: '#e9d5ff' },
-    fire:    { label: 'Fire',    grad: 'linear-gradient(135deg,#f7971e,#ffd200)', text: '#1a1a1a', accent: '#7c2d12' },
-    ocean:   { label: 'Ocean',   grad: 'linear-gradient(135deg,#2193b0,#6dd5ed)', text: '#fff', accent: '#e0f7fa' },
-    jungle:  { label: 'Jungle',  grad: 'linear-gradient(135deg,#11998e,#38ef7d)', text: '#fff', accent: '#d1fae5' },
-    sunset:  { label: 'Sunset',  grad: 'linear-gradient(135deg,#f953c6,#b91d73)', text: '#fff', accent: '#fce7f3' },
+    cosmic:  { label: 'Cosmic',  grad: 'linear-gradient(135deg,#667eea,#764ba2)', c1:'#667eea', c2:'#764ba2', text: '#ffffff', accent: '#e9d5ff' },
+    fire:    { label: 'Fire',    grad: 'linear-gradient(135deg,#f7971e,#ffd200)', c1:'#f7971e', c2:'#ffd200', text: '#1a1a1a', accent: '#7c2d12' },
+    ocean:   { label: 'Ocean',   grad: 'linear-gradient(135deg,#2193b0,#6dd5ed)', c1:'#2193b0', c2:'#6dd5ed', text: '#ffffff', accent: '#e0f7fa' },
+    jungle:  { label: 'Jungle',  grad: 'linear-gradient(135deg,#11998e,#38ef7d)', c1:'#11998e', c2:'#38ef7d', text: '#ffffff', accent: '#073b35' },
+    sunset:  { label: 'Sunset',  grad: 'linear-gradient(135deg,#f953c6,#b91d73)', c1:'#f953c6', c2:'#b91d73', text: '#ffffff', accent: '#fce7f3' },
 };
 
 function assignCenturyTitle(user) {
@@ -4085,7 +4085,9 @@ function assignCenturyTitle(user) {
     return "Showed Up Every Single Time 🫡";
 }
 
-let _cardPhotoDataUrl = null;
+let _cardPhotoDataUrl = null;   // dataURL string of chosen photo (persisted)
+let _cardPhotoImg = null;       // loaded Image object for canvas drawing
+let _proudSaveTimer = null;
 
 function openCardBuilder() {
     closeCenturyOverlay();
@@ -4093,22 +4095,35 @@ function openCardBuilder() {
     const existing = user.centuryClub || {};
 
     _cardPhotoDataUrl = existing.photo || null;
+    _cardPhotoImg = null;
 
     const input = $('cc-proud-input');
     if (input) input.value = existing.proudMoment || '';
 
-    // Set theme
+    // Set theme selection
     const savedTheme = existing.theme || 'cosmic';
     document.querySelectorAll('.cc-theme-dot').forEach(el => {
         el.classList.toggle('selected', el.dataset.theme === savedTheme);
     });
 
-    // Show auto-assigned title
-    const titleEl = $('cc-assigned-title');
-    if (titleEl) titleEl.textContent = assignCenturyTitle(user);
-
-    refreshCardPreview();
     openModal('card-builder-modal');
+
+    // Load saved photo (if any) then draw
+    if (_cardPhotoDataUrl) {
+        loadCardPhoto(_cardPhotoDataUrl, refreshCardPreview);
+    } else {
+        refreshCardPreview();
+    }
+    // Redraw once web fonts are ready so text uses Inter
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(refreshCardPreview);
+    }
+}
+
+function loadCardPhoto(dataUrl, cb) {
+    const img = new Image();
+    img.onload = () => { _cardPhotoImg = img; if (cb) cb(); };
+    img.src = dataUrl;
 }
 
 function handleCenturyPhoto(input) {
@@ -4117,7 +4132,7 @@ function handleCenturyPhoto(input) {
     const reader = new FileReader();
     reader.onload = e => {
         _cardPhotoDataUrl = e.target.result;
-        refreshCardPreview();
+        loadCardPhoto(_cardPhotoDataUrl, () => { refreshCardPreview(); persistCenturyCard(); });
     };
     reader.readAsDataURL(file);
 }
@@ -4131,86 +4146,256 @@ function selectCCTheme(dot) {
     document.querySelectorAll('.cc-theme-dot').forEach(d => d.classList.remove('selected'));
     dot.classList.add('selected');
     refreshCardPreview();
+    persistCenturyCard();
+}
+
+function onProudInput() {
+    refreshCardPreview();
+    clearTimeout(_proudSaveTimer);
+    _proudSaveTimer = setTimeout(persistCenturyCard, 400);
+}
+
+// Quietly persist the card choices so the Hall of Fame stays in sync.
+// No toast, no navigation — Hall of Fame is automatic.
+function persistCenturyCard() {
+    const user = appState.currentUser;
+    if (!user) return;
+    if (!user.centuryClub) user.centuryClub = {};
+    if (!user.centuryClub.unlockedAt) user.centuryClub.unlockedAt = new Date().toISOString();
+
+    user.centuryClub.photo = _cardPhotoDataUrl || null;
+    user.centuryClub.proudMoment = ($('cc-proud-input') && $('cc-proud-input').value.trim()) || '';
+    user.centuryClub.title = assignCenturyTitle(user);
+    user.centuryClub.theme = getSelectedTheme();
+
+    const idx = appState.participants.findIndex(p => p.phone === user.phone);
+    if (idx >= 0) appState.participants[idx].centuryClub = user.centuryClub;
+    saveData();
+}
+
+// ---- Canvas card rendering (this IS what gets shared) ----
+
+function ccRoundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+}
+
+function ccWrapLines(ctx, text, maxWidth) {
+    const words = text.split(' ');
+    const lines = [];
+    let line = '';
+    for (const w of words) {
+        const test = line ? line + ' ' + w : w;
+        if (ctx.measureText(test).width > maxWidth && line) {
+            lines.push(line);
+            line = w;
+        } else {
+            line = test;
+        }
+    }
+    if (line) lines.push(line);
+    return lines;
 }
 
 function refreshCardPreview() {
+    const canvas = $('cc-card-canvas');
+    if (!canvas) return;
     const user = appState.currentUser;
     if (!user) return;
 
     const theme = CENTURY_THEMES[getSelectedTheme()] || CENTURY_THEMES.cosmic;
     const title = assignCenturyTitle(user);
-    const proudMoment = ($('cc-proud-input') && $('cc-proud-input').value.trim()) || '100 days of showing up!';
+    const proudRaw = ($('cc-proud-input') && $('cc-proud-input').value.trim()) || 'Showed up. Every. Single. Day.';
     const total = calculateTotalWorkouts(user);
     const streak = calculateStreak(user);
     const currentDay = getCurrentDay();
     const rate = currentDay > 0 ? Math.round((total / currentDay) * 100) : 0;
 
-    const photoHTML = _cardPhotoDataUrl
-        ? `<img src="${_cardPhotoDataUrl}" class="cc-card-photo" alt="photo">`
-        : `<div class="cc-card-photo cc-card-photo-placeholder">💪</div>`;
+    const W = 1080, H = 1350;
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    const font = "'Inter', -apple-system, 'Helvetica Neue', Arial, sans-serif";
+    const text = theme.text;
+    const dark = theme.text === '#1a1a1a';
+    const softText = dark ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.82)';
+    const panel = dark ? 'rgba(255,255,255,0.30)' : 'rgba(0,0,0,0.18)';
 
-    const card = $('cc-card-preview');
-    if (!card) return;
+    // Background gradient
+    const g = ctx.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, theme.c1);
+    g.addColorStop(1, theme.c2);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
 
-    card.style.background = theme.grad;
-    card.style.color = theme.text;
-    card.innerHTML = `
-        <div class="cc-card-watermark">💯</div>
-        <div class="cc-card-inner">
-            ${photoHTML}
-            <div class="cc-card-badge" style="color:${theme.text};border-color:${theme.accent};background:rgba(255,255,255,0.18)">
-                ${title}
-            </div>
-            <div class="cc-card-name" style="color:${theme.text}">${user.name}</div>
-            <div class="cc-card-hundred" style="color:${theme.text}">💯 CENTURY DONE</div>
-            <div class="cc-card-proud" style="color:${theme.accent || theme.text};background:rgba(0,0,0,0.18)">"${proudMoment}"</div>
-            <div class="cc-card-stats" style="border-top:1px solid rgba(255,255,255,0.25)">
-                <div class="cc-card-stat"><span class="cc-card-stat-num">${total}</span><span class="cc-card-stat-lbl">Workouts</span></div>
-                <div class="cc-card-stat"><span class="cc-card-stat-num">${streak}</span><span class="cc-card-stat-lbl">Day Streak</span></div>
-                <div class="cc-card-stat"><span class="cc-card-stat-num">${rate}%</span><span class="cc-card-stat-lbl">Consistency</span></div>
-            </div>
-            <div class="cc-card-footer" style="color:${theme.accent || theme.text}">100 Days Workout · ${challengeSettings.seasonName}</div>
-        </div>
-    `;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Faint giant "100" watermark
+    ctx.save();
+    ctx.globalAlpha = dark ? 0.12 : 0.10;
+    ctx.fillStyle = text;
+    ctx.font = `900 560px ${font}`;
+    ctx.fillText('100', W / 2, H * 0.52);
+    ctx.restore();
+
+    // Photo / placeholder
+    const cx = W / 2, cy = 290, r = 125;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.lineWidth = 10;
+    ctx.strokeStyle = dark ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.75)';
+    if (_cardPhotoImg) {
+        ctx.save();
+        ctx.clip();
+        // cover-fit the image into the circle
+        const img = _cardPhotoImg;
+        const scale = Math.max((r * 2) / img.width, (r * 2) / img.height);
+        const dw = img.width * scale, dh = img.height * scale;
+        ctx.drawImage(img, cx - dw / 2, cy - dh / 2, dw, dh);
+        ctx.restore();
+        ctx.stroke();
+    } else {
+        ctx.fillStyle = dark ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.2)';
+        ctx.fill();
+        ctx.stroke();
+        ctx.font = '110px sans-serif';
+        ctx.fillText('💪', cx, cy + 6);
+    }
+    ctx.restore();
+
+    // Title pill
+    ctx.font = `800 38px ${font}`;
+    const titleW = ctx.measureText(title).width;
+    const padX = 36, pillH = 70;
+    const pillW = titleW + padX * 2;
+    const pillY = 455;
+    ctx.save();
+    ccRoundRect(ctx, cx - pillW / 2, pillY, pillW, pillH, pillH / 2);
+    ctx.fillStyle = dark ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.20)';
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = dark ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.5)';
+    ctx.stroke();
+    ctx.fillStyle = text;
+    ctx.fillText(title, cx, pillY + pillH / 2 + 2);
+    ctx.restore();
+
+    // Name
+    ctx.fillStyle = text;
+    ctx.font = `900 70px ${font}`;
+    ctx.fillText(user.name, cx, 600);
+
+    // CENTURY DONE
+    ctx.font = `800 46px ${font}`;
+    ctx.fillText('💯 CENTURY DONE', cx, 672);
+
+    // Proud moment panel
+    ctx.font = `italic 600 40px ${font}`;
+    const lines = ccWrapLines(ctx, '“' + proudRaw + '”', W - 220).slice(0, 3);
+    const lineH = 54;
+    const boxPadY = 34;
+    const boxH = lines.length * lineH + boxPadY * 2 - 14;
+    const boxW = W - 180;
+    const boxY = 740;
+    ctx.save();
+    ccRoundRect(ctx, cx - boxW / 2, boxY, boxW, boxH, 28);
+    ctx.fillStyle = panel;
+    ctx.fill();
+    ctx.fillStyle = text;
+    let ty = boxY + boxPadY + lineH / 2;
+    lines.forEach(ln => { ctx.fillText(ln, cx, ty); ty += lineH; });
+    ctx.restore();
+
+    // Stats row
+    const statsY = boxY + boxH + 110;
+    const cols = [
+        { num: String(total), lbl: 'WORKOUTS' },
+        { num: String(streak), lbl: 'DAY STREAK' },
+        { num: rate + '%', lbl: 'CONSISTENCY' },
+    ];
+    const colX = [W * 0.25, W * 0.5, W * 0.75];
+    // separators
+    ctx.strokeStyle = dark ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 2;
+    [W * 0.375, W * 0.625].forEach(x => {
+        ctx.beginPath();
+        ctx.moveTo(x, statsY - 40);
+        ctx.lineTo(x, statsY + 50);
+        ctx.stroke();
+    });
+    cols.forEach((c, i) => {
+        ctx.fillStyle = text;
+        ctx.font = `900 76px ${font}`;
+        ctx.fillText(c.num, colX[i], statsY - 8);
+        ctx.fillStyle = softText;
+        ctx.font = `700 26px ${font}`;
+        ctx.fillText(c.lbl, colX[i], statsY + 52);
+    });
+
+    // Footer
+    ctx.fillStyle = softText;
+    ctx.font = `600 28px ${font}`;
+    ctx.fillText('100 Days of Workout · ' + challengeSettings.seasonName, cx, H - 70);
 }
 
-function saveCenturyCard() {
+function ccShareCaption() {
     const user = appState.currentUser;
-    if (!user) return;
-
-    const proudMoment = ($('cc-proud-input') && $('cc-proud-input').value.trim()) || '';
-    if (!user.centuryClub) user.centuryClub = {};
-
-    user.centuryClub.photo = _cardPhotoDataUrl || null;
-    user.centuryClub.proudMoment = proudMoment;
-    user.centuryClub.title = assignCenturyTitle(user);
-    user.centuryClub.theme = getSelectedTheme();
-    user.centuryClub.cardClaimed = true;
-
-    const idx = appState.participants.findIndex(p => p.phone === user.phone);
-    if (idx >= 0) appState.participants[idx].centuryClub = user.centuryClub;
-    saveData();
-
-    closeModal('card-builder-modal');
-    showToast('Your card is saved! Check the Hall of Fame 🏆', 'success');
-    showTab('halloffame');
+    const total = calculateTotalWorkouts(user);
+    const streak = calculateStreak(user);
+    return `💯 I just completed 100 days of workouts!\n🏋️ ${total} workouts · 🔥 ${streak} day streak\n\n#100DaysWorkout #CenturyClub`;
 }
 
 function shareCenturyCard() {
-    const user = appState.currentUser;
-    if (!user) return;
-    const total = calculateTotalWorkouts(user);
-    const streak = calculateStreak(user);
-    const proudMoment = (user.centuryClub && user.centuryClub.proudMoment) ? `"${user.centuryClub.proudMoment}"` : '';
-    const title = (user.centuryClub && user.centuryClub.title) ? user.centuryClub.title : '';
+    const canvas = $('cc-card-canvas');
+    if (!canvas) return;
+    persistCenturyCard();
 
-    const text = `💯 I just completed 100 days of workouts!\n\n${title}\n\n${proudMoment}\n\n🏋️ ${total} workouts · 🔥 ${streak} day streak\n\n#100DaysWorkout #CenturyClub #${challengeSettings.seasonName.replace(' ', '')}`;
+    canvas.toBlob(async (blob) => {
+        if (!blob) { showToast('Could not generate image', 'error'); return; }
+        const file = new File([blob], 'my-century-card.png', { type: 'image/png' });
 
-    if (navigator.share) {
-        navigator.share({ text }).catch(() => {});
-    } else {
-        navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard! 📋', 'success'));
-    }
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+                await navigator.share({ files: [file], text: ccShareCaption() });
+            } catch (e) {
+                // user cancelled — no-op
+            }
+        } else {
+            ccDownloadBlob(blob);
+            showToast('Image saved! Share it on WhatsApp 📲', 'success');
+        }
+    }, 'image/png');
+}
+
+function downloadCenturyCard() {
+    const canvas = $('cc-card-canvas');
+    if (!canvas) return;
+    persistCenturyCard();
+    canvas.toBlob(blob => {
+        if (blob) {
+            ccDownloadBlob(blob);
+            showToast('Saved to your photos! 📸', 'success');
+        }
+    }, 'image/png');
+}
+
+function ccDownloadBlob(blob) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'my-century-card.png';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // ---- Hall of Fame ----

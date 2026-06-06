@@ -828,47 +828,42 @@
             <button class="modal-close" onclick="closeModal('card-builder-modal')">×</button>
         </div>
         <div class="modal-body cc-builder-body">
-            <!-- Live card preview -->
-            <div id="cc-card-preview" class="cc-card-preview"></div>
+            <!-- Live card preview (this is exactly what gets shared) -->
+            <div class="cc-canvas-wrap">
+                <canvas id="cc-card-canvas" class="cc-card-canvas"></canvas>
+            </div>
 
-            <!-- Photo upload -->
-            <div class="cc-builder-section">
-                <label class="cc-builder-label">📸 Add Your Photo</label>
-                <label class="cc-photo-upload-btn">
-                    Drop a photo in
-                    <input type="file" accept="image/*" onchange="handleCenturyPhoto(this)" style="display:none">
+            <div class="cc-fun-form">
+                <p class="cc-fun-tip">👇 Make it yours, then blast it to the group</p>
+
+                <!-- Photo upload -->
+                <label class="cc-fun-photo">
+                    <span class="cc-fun-photo-emoji">🤳</span>
+                    <span class="cc-fun-photo-text">Tap to add your photo</span>
+                    <input type="file" accept="image/*" onchange="handleCenturyPhoto(this)" hidden>
                 </label>
-            </div>
 
-            <!-- Proud moment -->
-            <div class="cc-builder-section">
-                <label class="cc-builder-label">🏅 One thing you're most proud of</label>
-                <input id="cc-proud-input" class="cc-proud-input" type="text"
-                    maxlength="80" placeholder="e.g. Never missed a Monday!"
-                    oninput="refreshCardPreview()">
-            </div>
+                <!-- Proud moment -->
+                <input id="cc-proud-input" class="cc-fun-input" type="text"
+                    maxlength="70" placeholder="💬 Brag a little… &quot;Never skipped leg day!&quot;"
+                    oninput="onProudInput()">
 
-            <!-- Auto-assigned title -->
-            <div class="cc-builder-section">
-                <label class="cc-builder-label">⚡ Your title (we assigned this based on your data)</label>
-                <div class="cc-auto-title" id="cc-assigned-title">Showed Up Every Single Time 🫡</div>
-            </div>
-
-            <!-- Theme picker -->
-            <div class="cc-builder-section">
-                <label class="cc-builder-label">🎨 Choose your vibe</label>
-                <div class="cc-theme-dots">
-                    <div class="cc-theme-dot selected" data-theme="cosmic" onclick="selectCCTheme(this)" style="background:linear-gradient(135deg,#667eea,#764ba2)" title="Cosmic"></div>
-                    <div class="cc-theme-dot" data-theme="fire" onclick="selectCCTheme(this)" style="background:linear-gradient(135deg,#f7971e,#ffd200)" title="Fire"></div>
-                    <div class="cc-theme-dot" data-theme="ocean" onclick="selectCCTheme(this)" style="background:linear-gradient(135deg,#2193b0,#6dd5ed)" title="Ocean"></div>
-                    <div class="cc-theme-dot" data-theme="jungle" onclick="selectCCTheme(this)" style="background:linear-gradient(135deg,#11998e,#38ef7d)" title="Jungle"></div>
-                    <div class="cc-theme-dot" data-theme="sunset" onclick="selectCCTheme(this)" style="background:linear-gradient(135deg,#f953c6,#b91d73)" title="Sunset"></div>
+                <!-- Vibe picker -->
+                <div class="cc-fun-vibe">
+                    <span class="cc-fun-vibe-label">Pick your vibe 🎨</span>
+                    <div class="cc-theme-dots">
+                        <div class="cc-theme-dot selected" data-theme="cosmic" onclick="selectCCTheme(this)" style="background:linear-gradient(135deg,#667eea,#764ba2)" title="Cosmic"></div>
+                        <div class="cc-theme-dot" data-theme="fire" onclick="selectCCTheme(this)" style="background:linear-gradient(135deg,#f7971e,#ffd200)" title="Fire"></div>
+                        <div class="cc-theme-dot" data-theme="ocean" onclick="selectCCTheme(this)" style="background:linear-gradient(135deg,#2193b0,#6dd5ed)" title="Ocean"></div>
+                        <div class="cc-theme-dot" data-theme="jungle" onclick="selectCCTheme(this)" style="background:linear-gradient(135deg,#11998e,#38ef7d)" title="Jungle"></div>
+                        <div class="cc-theme-dot" data-theme="sunset" onclick="selectCCTheme(this)" style="background:linear-gradient(135deg,#f953c6,#b91d73)" title="Sunset"></div>
+                    </div>
                 </div>
             </div>
 
             <div class="cc-builder-actions">
-                <button class="btn-secondary" onclick="shareCenturyCard()">📤 Share Text</button>
-                <button class="btn-primary" onclick="saveCenturyCard()">🏆 Save to Hall of Fame</button>
+                <button class="cc-share-btn" onclick="shareCenturyCard()">📲 Share to WhatsApp / Insta</button>
+                <button class="cc-download-btn" onclick="downloadCenturyCard()" title="Save image">⬇️</button>
             </div>
         </div>
       </div>
