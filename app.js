@@ -3680,15 +3680,20 @@ function showSpreadsheetView() {
 function openModal(modalId) {
     const modal = $(modalId);
     if (modal) modal.classList.add('active');
+    document.body.classList.add('modal-open');
 }
 
 function closeModal(modalId) {
     const modal = $(modalId);
     if (modal) modal.classList.remove('active');
+    if (!document.querySelector('.modal.active')) {
+        document.body.classList.remove('modal-open');
+    }
 }
 
 function closeAnyModal() {
     document.querySelectorAll('.modal.active').forEach(m => m.classList.remove('active'));
+    document.body.classList.remove('modal-open');
 }
 
 // ============================================
@@ -4106,6 +4111,12 @@ function openCardBuilder() {
         el.classList.toggle('selected', el.dataset.theme === savedTheme);
     });
 
+    // Set template selection
+    const savedTpl = existing.template || 'pop';
+    document.querySelectorAll('.cc-tpl-pill').forEach(el => {
+        el.classList.toggle('selected', el.dataset.tpl === savedTpl);
+    });
+
     openModal('card-builder-modal');
 
     // Load saved photo (if any) then draw
@@ -4186,6 +4197,7 @@ function persistCenturyCard() {
     user.centuryClub.proudMoment = ($('cc-proud-input') && $('cc-proud-input').value.trim()) || '';
     user.centuryClub.title = assignCenturyTitle(user);
     user.centuryClub.theme = getSelectedTheme();
+    user.centuryClub.template = getSelectedTemplate();
 
     const idx = appState.participants.findIndex(p => p.phone === user.phone);
     if (idx >= 0) appState.participants[idx].centuryClub = user.centuryClub;
@@ -4231,89 +4243,51 @@ function ccFitFont(ctx, txt, weight, startPx, minPx, maxW, font) {
     return s;
 }
 
-function refreshCardPreview() {
-    const canvas = $('cc-card-canvas');
-    if (!canvas) return;
+function ccCardData() {
     const user = appState.currentUser;
-    if (!user) return;
-
     const theme = CENTURY_THEMES[getSelectedTheme()] || CENTURY_THEMES.cosmic;
-    const title = assignCenturyTitle(user);
-    const proudRaw = ($('cc-proud-input') && $('cc-proud-input').value.trim()) || 'Showed up. Every. Single. Day.';
     const total = calculateTotalWorkouts(user);
-    const streak = calculateStreak(user);
     const currentDay = getCurrentDay();
-    const rate = currentDay > 0 ? Math.round((total / currentDay) * 100) : 0;
+    return {
+        user: user,
+        theme: theme,
+        name: user.name,
+        title: assignCenturyTitle(user),
+        proud: ($('cc-proud-input') && $('cc-proud-input').value.trim()) || 'Showed up. Every. Single. Day.',
+        total: total,
+        streak: calculateStreak(user),
+        rate: currentDay > 0 ? Math.round((total / currentDay) * 100) : 0,
+        dark: theme.text === '#1a1a1a',
+        font: "'Inter', -apple-system, 'Helvetica Neue', Arial, sans-serif",
+        season: challengeSettings.seasonName
+    };
+}
 
-    const W = 1080, H = 1350, cx = W / 2;
-    canvas.width = W;
-    canvas.height = H;
-    const ctx = canvas.getContext('2d');
-    const font = "'Inter', -apple-system, 'Helvetica Neue', Arial, sans-serif";
-    const text = theme.text;
-    const dark = theme.text === '#1a1a1a';
-    const softText = dark ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.85)';
-    const chipBg = dark ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.16)';
-    const lightInk = dark ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.95)';
+function getSelectedTemplate() {
+    const el = document.querySelector('.cc-tpl-pill.selected');
+    return (el && el.dataset.tpl) ? el.dataset.tpl : 'pop';
+}
 
-    // Background gradient
-    const g = ctx.createLinearGradient(0, 0, W, H);
-    g.addColorStop(0, theme.c1);
-    g.addColorStop(1, theme.c2);
+function selectCCTemplate(pill) {
+    document.querySelectorAll('.cc-tpl-pill').forEach(p => p.classList.remove('selected'));
+    pill.classList.add('selected');
+    refreshCardPreview();
+    persistCenturyCard();
+}
+
+function ccBg(ctx, W, H, c1, c2, diag) {
+    const g = diag ? ctx.createLinearGradient(0, 0, W, H) : ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, c1);
+    g.addColorStop(1, c2);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
+}
 
-    // Soft bokeh glow circles for depth
+function ccDrawCirclePhoto(ctx, cx, cy, r, ringColor, ringW, dark) {
     ctx.save();
-    ctx.globalAlpha = 0.10;
-    ctx.fillStyle = '#ffffff';
-    [[-60, -40, 300], [W + 60, 220, 260], [-40, H - 120, 280], [W + 40, H + 40, 340]].forEach(([x, y, rr]) => {
-        ctx.beginPath(); ctx.arc(x, y, rr, 0, Math.PI * 2); ctx.fill();
-    });
-    ctx.restore();
-
-    // Confetti dots — lively but out of the text zone
-    const confetti = [
-        [70, 120, 16, '#ffd200'], [1000, 90, 20, '#ff5fa2'], [930, 250, 12, '#5fd0ff'],
-        [150, 300, 12, '#7CFFB2'], [60, 520, 10, '#ffffff'], [1025, 560, 12, '#ffd200'],
-        [90, 1180, 18, '#5fd0ff'], [1000, 1150, 16, '#ff5fa2'], [200, 1255, 13, '#ffd200'],
-        [880, 1270, 14, '#7CFFB2'], [1015, 1265, 9, '#ffffff'], [120, 1280, 9, '#ffffff'],
-    ];
-    ctx.save();
-    ctx.globalAlpha = 0.85;
-    confetti.forEach(([x, y, rr, col]) => {
-        ctx.fillStyle = col;
-        ctx.beginPath(); ctx.arc(x, y, rr, 0, Math.PI * 2); ctx.fill();
-    });
-    ctx.restore();
-
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    // Top banner ribbon: CENTURY CLUB
-    const bannerTxt = '🏆  CENTURY CLUB';
-    ctx.font = `800 40px ${font}`;
-    const bw = ctx.measureText(bannerTxt).width + 80;
-    const bh = 76, by = 70;
-    ctx.save();
-    ccRoundRect(ctx, cx - bw / 2, by, bw, bh, bh / 2);
-    ctx.fillStyle = dark ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.22)';
-    ctx.fill();
-    ctx.fillStyle = lightInk;
-    ctx.fillText(bannerTxt, cx, by + bh / 2 + 2);
-    ctx.restore();
-
-    // Photo with ring + 💯 badge
-    const cy = 330, r = 135;
-    // glow ring
-    ctx.save();
-    ctx.beginPath(); ctx.arc(cx, cy, r + 14, 0, Math.PI * 2);
-    ctx.fillStyle = dark ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.35)';
-    ctx.fill();
-    ctx.restore();
-
-    ctx.save();
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.closePath();
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.closePath();
     if (_cardPhotoImg) {
         ctx.save();
         ctx.clip();
@@ -4323,92 +4297,315 @@ function refreshCardPreview() {
         ctx.drawImage(img, cx - dw / 2, cy - dh / 2, dw, dh);
         ctx.restore();
     } else {
-        ctx.fillStyle = dark ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.22)';
+        ctx.fillStyle = dark ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,0.22)';
         ctx.fill();
-        ctx.font = '120px sans-serif';
-        ctx.fillText('💪', cx, cy + 8);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = '110px sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('💪', cx, cy + 6);
     }
-    ctx.lineWidth = 12;
-    ctx.strokeStyle = dark ? 'rgba(0,0,0,0.4)' : '#ffffff';
-    ctx.stroke();
+    if (ringW) {
+        ctx.lineWidth = ringW;
+        ctx.strokeStyle = ringColor;
+        ctx.stroke();
+    }
     ctx.restore();
+}
 
-    // 💯 badge bottom-right of photo
-    const bx = cx + r * 0.72, byy = cy + r * 0.72;
+function ccDrawRectPhoto(ctx, x, y, w, h, r) {
     ctx.save();
-    ctx.beginPath(); ctx.arc(bx, byy, 54, 0, Math.PI * 2);
+    ccRoundRect(ctx, x, y, w, h, r);
+    ctx.clip();
+    if (_cardPhotoImg) {
+        const img = _cardPhotoImg;
+        const sc = Math.max(w / img.width, h / img.height);
+        const dw = img.width * sc, dh = img.height * sc;
+        ctx.drawImage(img, x + w / 2 - dw / 2, y + h / 2 - dh / 2, dw, dh);
+    } else {
+        ctx.fillStyle = '#e5e7eb';
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#9ca3af';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = '130px sans-serif';
+        ctx.fillText('💪', x + w / 2, y + h / 2);
+    }
+    ctx.restore();
+}
+
+function refreshCardPreview() {
+    const canvas = $('cc-card-canvas');
+    if (!canvas) return;
+    const user = appState.currentUser;
+    if (!user) return;
+    const W = 1080, H = 1350;
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    const d = ccCardData();
+    const fn = { pop: ccTplPop, bold: ccTplBold, polaroid: ccTplPolaroid, ticket: ccTplTicket }[getSelectedTemplate()] || ccTplPop;
+    fn(ctx, W, H, d);
+}
+
+/* ---- Variant 1: Confetti Pop ---- */
+function ccTplPop(ctx, W, H, d) {
+    const cx = W / 2, font = d.font, text = d.theme.text, dark = d.dark;
+    const softText = dark ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.85)';
+    const chipBg = dark ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.16)';
+    const lightInk = dark ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.95)';
+    ccBg(ctx, W, H, d.theme.c1, d.theme.c2, true);
+
+    ctx.save();
+    ctx.globalAlpha = 0.10;
     ctx.fillStyle = '#ffffff';
-    ctx.fill();
-    ctx.font = '58px sans-serif';
-    ctx.fillText('💯', bx, byy + 4);
+    [[-60,-40,300],[W+60,220,260],[-40,H-120,280],[W+40,H+40,340]].forEach(function(p){ ctx.beginPath(); ctx.arc(p[0],p[1],p[2],0,Math.PI*2); ctx.fill(); });
     ctx.restore();
 
-    // Name (auto-fit)
-    ctx.fillStyle = text;
-    const nameSize = ccFitFont(ctx, user.name, '900', 78, 48, W - 160, font);
-    ctx.font = `900 ${nameSize}px ${font}`;
-    ctx.fillText(user.name, cx, 580);
-
-    // Funny title pill (auto-fit)
-    const titleSize = ccFitFont(ctx, title, '800', 40, 26, W - 200, font);
-    ctx.font = `800 ${titleSize}px ${font}`;
-    const titleW = ctx.measureText(title).width;
-    const pillH = 72, pillW = titleW + 72, pillY = 632;
+    const confetti = [[70,120,16,'#ffd200'],[1000,90,20,'#ff5fa2'],[930,250,12,'#5fd0ff'],[150,300,12,'#7CFFB2'],[60,520,10,'#ffffff'],[1025,560,12,'#ffd200'],[90,1180,18,'#5fd0ff'],[1000,1150,16,'#ff5fa2'],[200,1255,13,'#ffd200'],[880,1270,14,'#7CFFB2'],[1015,1265,9,'#ffffff'],[120,1280,9,'#ffffff']];
     ctx.save();
-    ccRoundRect(ctx, cx - pillW / 2, pillY, pillW, pillH, pillH / 2);
+    ctx.globalAlpha = 0.85;
+    confetti.forEach(function(p){ ctx.fillStyle=p[3]; ctx.beginPath(); ctx.arc(p[0],p[1],p[2],0,Math.PI*2); ctx.fill(); });
+    ctx.restore();
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const bannerTxt = '🏆  CENTURY CLUB';
+    ctx.font = '800 40px ' + font;
+    const bw = ctx.measureText(bannerTxt).width + 80, bh = 76, by = 70;
+    ctx.save();
+    ccRoundRect(ctx, cx - bw/2, by, bw, bh, bh/2);
+    ctx.fillStyle = dark ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.22)';
+    ctx.fill();
+    ctx.fillStyle = lightInk;
+    ctx.fillText(bannerTxt, cx, by + bh/2 + 2);
+    ctx.restore();
+
+    const cy = 330, r = 135;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, cy, r + 14, 0, Math.PI*2);
+    ctx.fillStyle = dark ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.35)';
+    ctx.fill();
+    ctx.restore();
+    ccDrawCirclePhoto(ctx, cx, cy, r, dark ? 'rgba(0,0,0,0.4)' : '#ffffff', 12, dark);
+
+    const bx = cx + r*0.72, byy = cy + r*0.72;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(bx, byy, 54, 0, Math.PI*2);
+    ctx.fillStyle = '#ffffff'; ctx.fill();
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.font = '58px sans-serif'; ctx.fillText('💯', bx, byy + 4);
+    ctx.restore();
+
+    ctx.fillStyle = text;
+    const nameSize = ccFitFont(ctx, d.name, '900', 78, 48, W - 160, font);
+    ctx.font = '900 ' + nameSize + 'px ' + font;
+    ctx.fillText(d.name, cx, 580);
+
+    const titleSize = ccFitFont(ctx, d.title, '800', 40, 26, W - 200, font);
+    ctx.font = '800 ' + titleSize + 'px ' + font;
+    const titleW = ctx.measureText(d.title).width, pillH = 72, pillW = titleW + 72, pillY = 632;
+    ctx.save();
+    ccRoundRect(ctx, cx - pillW/2, pillY, pillW, pillH, pillH/2);
     ctx.fillStyle = dark ? 'rgba(0,0,0,0.16)' : 'rgba(0,0,0,0.22)';
     ctx.fill();
     ctx.fillStyle = lightInk;
-    ctx.font = `800 ${titleSize}px ${font}`;
-    ctx.fillText(title, cx, pillY + pillH / 2 + 2);
+    ctx.font = '800 ' + titleSize + 'px ' + font;
+    ctx.fillText(d.title, cx, pillY + pillH/2 + 2);
     ctx.restore();
 
-    // Proud moment — speech-bubble style panel
-    ctx.font = `italic 600 42px ${font}`;
-    const lines = ccWrapLines(ctx, '“' + proudRaw + '”', W - 260).slice(0, 3);
+    ctx.font = 'italic 600 42px ' + font;
+    const lines = ccWrapLines(ctx, '“' + d.proud + '”', W - 260).slice(0,3);
     const lineH = 56, boxPadY = 38;
-    const boxH = lines.length * lineH + boxPadY * 2 - 16;
-    const boxW = W - 200, boxY = 770;
+    const boxH = lines.length*lineH + boxPadY*2 - 16, boxW = W - 200, boxY = 770;
     ctx.save();
-    ccRoundRect(ctx, cx - boxW / 2, boxY, boxW, boxH, 30);
+    ccRoundRect(ctx, cx - boxW/2, boxY, boxW, boxH, 30);
     ctx.fillStyle = dark ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.16)';
     ctx.fill();
     ctx.fillStyle = text;
-    let ty = boxY + boxPadY + lineH / 2;
-    lines.forEach(ln => { ctx.fillText(ln, cx, ty); ty += lineH; });
+    let ty = boxY + boxPadY + lineH/2;
+    lines.forEach(function(ln){ ctx.fillText(ln, cx, ty); ty += lineH; });
     ctx.restore();
 
-    // Stat chips
-    const chipY = boxY + boxH + 50, chipH = 184, gap = 26;
-    const sideMargin = 60;
-    const chipW = (W - sideMargin * 2 - gap * 2) / 3;
-    const cols = [
-        { num: String(total), lbl: 'WORKOUTS', emo: '🏋️' },
-        { num: String(streak), lbl: 'DAY STREAK', emo: '🔥' },
-        { num: rate + '%', lbl: 'CONSISTENCY', emo: '🎯' },
-    ];
-    cols.forEach((c, i) => {
-        const x = sideMargin + i * (chipW + gap);
-        ctx.save();
-        ccRoundRect(ctx, x, chipY, chipW, chipH, 26);
-        ctx.fillStyle = chipBg;
-        ctx.fill();
-        ctx.restore();
-        const ccx = x + chipW / 2;
-        ctx.fillStyle = text;
-        ctx.font = '40px sans-serif';
-        ctx.fillText(c.emo, ccx, chipY + 46);
-        ctx.font = `900 64px ${font}`;
-        ctx.fillText(c.num, ccx, chipY + 104);
-        ctx.fillStyle = softText;
-        ctx.font = `700 24px ${font}`;
-        ctx.fillText(c.lbl, ccx, chipY + 150);
+    const chipY = boxY + boxH + 50, chipH = 184, gap = 26, sideMargin = 60;
+    const chipW = (W - sideMargin*2 - gap*2)/3;
+    const cols = [{num:String(d.total),lbl:'WORKOUTS',emo:'🏋️'},{num:String(d.streak),lbl:'DAY STREAK',emo:'🔥'},{num:d.rate+'%',lbl:'CONSISTENCY',emo:'🎯'}];
+    cols.forEach(function(c,i){
+        const x = sideMargin + i*(chipW+gap);
+        ctx.save(); ccRoundRect(ctx, x, chipY, chipW, chipH, 26); ctx.fillStyle = chipBg; ctx.fill(); ctx.restore();
+        const ccx = x + chipW/2;
+        ctx.fillStyle = text; ctx.font = '40px sans-serif'; ctx.fillText(c.emo, ccx, chipY + 46);
+        ctx.font = '900 64px ' + font; ctx.fillText(c.num, ccx, chipY + 104);
+        ctx.fillStyle = softText; ctx.font = '700 24px ' + font; ctx.fillText(c.lbl, ccx, chipY + 150);
     });
 
-    // Footer
+    ctx.fillStyle = softText; ctx.font = '600 28px ' + font;
+    ctx.fillText('100 Days of Workout · ' + d.season, cx, H - 60);
+}
+
+/* ---- Variant 2: Bold Minimal ---- */
+function ccTplBold(ctx, W, H, d) {
+    const cx = W/2, font = d.font, text = d.theme.text, dark = d.dark;
+    const softText = dark ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.8)';
+    ccBg(ctx, W, H, d.theme.c2, d.theme.c1, false);
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+
+    ctx.save();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = dark ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.5)';
+    ccRoundRect(ctx, 46, 46, W-92, H-92, 36);
+    ctx.stroke();
+    ctx.restore();
+
     ctx.fillStyle = softText;
-    ctx.font = `600 28px ${font}`;
-    ctx.fillText('100 Days of Workout · ' + challengeSettings.seasonName, cx, H - 60);
+    ctx.font = '800 30px ' + font;
+    ctx.fillText('★  THE CENTURY CLUB  ★', cx, 140);
+
+    ccDrawCirclePhoto(ctx, cx, 330, 120, dark?'rgba(0,0,0,0.4)':'#ffffff', 8, dark);
+
+    ctx.fillStyle = text;
+    const nameSize = ccFitFont(ctx, d.name, '900', 96, 52, W - 200, font);
+    ctx.font = '900 ' + nameSize + 'px ' + font;
+    ctx.fillText(d.name, cx, 560);
+
+    const titleSize = ccFitFont(ctx, d.title, '700', 38, 26, W - 220, font);
+    ctx.font = '700 ' + titleSize + 'px ' + font;
+    ctx.fillStyle = softText;
+    ctx.fillText(d.title, cx, 636);
+
+    ctx.strokeStyle = dark?'rgba(0,0,0,0.3)':'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(cx-90, 700); ctx.lineTo(cx+90, 700); ctx.stroke();
+
+    ctx.fillStyle = text;
+    ctx.font = 'italic 600 44px ' + font;
+    const lines = ccWrapLines(ctx, '“'+d.proud+'”', W-260).slice(0,3);
+    let ty = 800;
+    lines.forEach(function(ln){ ctx.fillText(ln, cx, ty); ty += 58; });
+
+    ctx.fillStyle = text;
+    ctx.font = '900 130px ' + font;
+    ctx.fillText('100', cx, 1015);
+    ctx.font = '800 34px ' + font;
+    ctx.fillStyle = softText;
+    ctx.fillText('DAYS DONE', cx, 1090);
+
+    const cols=[[String(d.total),'WORKOUTS'],[String(d.streak),'STREAK'],[d.rate+'%','RATE']];
+    const colX=[W*0.27,W*0.5,W*0.73], sy=1205;
+    ctx.strokeStyle = dark?'rgba(0,0,0,0.25)':'rgba(255,255,255,0.4)';
+    ctx.lineWidth=2;
+    [W*0.385,W*0.615].forEach(function(x){ ctx.beginPath(); ctx.moveTo(x,sy-30); ctx.lineTo(x,sy+44); ctx.stroke(); });
+    cols.forEach(function(c,i){
+        ctx.fillStyle=text; ctx.font='900 60px ' + font; ctx.fillText(c[0],colX[i],sy);
+        ctx.fillStyle=softText; ctx.font='700 22px ' + font; ctx.fillText(c[1],colX[i],sy+50);
+    });
+}
+
+/* ---- Variant 3: Polaroid ---- */
+function ccTplPolaroid(ctx, W, H, d) {
+    const cx = W/2, font = d.font;
+    ccBg(ctx, W, H, d.theme.c1, d.theme.c2, true);
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+
+    const px=90, py=120, pw=W-180, ph=1080;
+    ctx.save();
+    ctx.shadowColor='rgba(0,0,0,0.3)'; ctx.shadowBlur=40; ctx.shadowOffsetY=18;
+    ccRoundRect(ctx, px, py, pw, ph, 28);
+    ctx.fillStyle='#ffffff'; ctx.fill();
+    ctx.restore();
+
+    const pad=44;
+    const imgH = Math.round((pw - pad*2) * 0.82);
+    ccDrawRectPhoto(ctx, px+pad, py+pad, pw-pad*2, imgH, 18);
+
+    ctx.save(); ctx.translate(px+34, py+34); ctx.rotate(-0.25); ctx.font='82px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('💯',0,0); ctx.restore();
+    ctx.save(); ctx.translate(px+pw-34, py+38); ctx.rotate(0.22); ctx.font='70px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🎉',0,0); ctx.restore();
+
+    const capTop = py+pad+imgH;
+    ctx.fillStyle='#1f2937';
+    ctx.font='italic 700 46px ' + font;
+    const lines = ccWrapLines(ctx, '“'+d.proud+'”', pw-120).slice(0,2);
+    let ty = capTop + 70;
+    lines.forEach(function(ln){ ctx.fillText(ln, cx, ty); ty+=58; });
+
+    ctx.fillStyle='#6d28d9';
+    const ns = ccFitFont(ctx, d.name, '900', 54, 34, pw-140, font);
+    ctx.font='900 ' + ns + 'px ' + font;
+    ctx.fillText(d.name, cx, ty+40);
+    ctx.fillStyle='#9ca3af';
+    ctx.font='700 26px ' + font;
+    ctx.fillText('100 DAYS DONE · ' + d.season.toUpperCase(), cx, ty+96);
+
+    const sy = py+ph+62;
+    const cols=[[String(d.total),'🏋️'],[String(d.streak),'🔥'],[d.rate+'%','🎯']];
+    const colX=[W*0.27,W*0.5,W*0.73];
+    cols.forEach(function(c,i){
+        ctx.fillStyle=d.theme.text; ctx.font='34px sans-serif'; ctx.fillText(c[1],colX[i],sy);
+        ctx.font='900 52px ' + font; ctx.fillText(c[0],colX[i],sy+56);
+    });
+}
+
+/* ---- Variant 4: Ticket Stub ---- */
+function ccTplTicket(ctx, W, H, d) {
+    const cx=W/2, font=d.font, text=d.theme.text, dark=d.dark;
+    const softText = dark?'rgba(0,0,0,0.55)':'rgba(255,255,255,0.82)';
+    ccBg(ctx, W, H, d.theme.c1, d.theme.c2, true);
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+
+    const tx=70, tyTop=150, tw=W-140, th=1050;
+    ctx.save();
+    ccRoundRect(ctx, tx, tyTop, tw, th, 34);
+    ctx.fillStyle = dark?'rgba(255,255,255,0.22)':'rgba(255,255,255,0.14)';
+    ctx.fill();
+    ctx.restore();
+
+    ctx.fillStyle = softText;
+    ctx.font = '800 30px ' + font;
+    ctx.fillText('🎟  ADMIT ONE  ·  CENTURY CLUB', cx, tyTop+70);
+
+    ccDrawCirclePhoto(ctx, cx, tyTop+250, 118, dark?'rgba(0,0,0,0.35)':'#ffffff', 8, dark);
+
+    ctx.fillStyle=text;
+    const nameSize=ccFitFont(ctx,d.name,'900',74,46,tw-120,font);
+    ctx.font='900 ' + nameSize + 'px ' + font;
+    ctx.fillText(d.name, cx, tyTop+450);
+
+    const titleSize=ccFitFont(ctx,d.title,'700',34,24,tw-140,font);
+    ctx.font='700 ' + titleSize + 'px ' + font;
+    ctx.fillStyle=softText;
+    ctx.fillText(d.title, cx, tyTop+518);
+
+    ctx.fillStyle=text;
+    ctx.font='italic 600 38px ' + font;
+    const lines=ccWrapLines(ctx,'“'+d.proud+'”',tw-140).slice(0,2);
+    let ty=tyTop+590;
+    lines.forEach(function(ln){ ctx.fillText(ln,cx,ty); ty+=50; });
+
+    const perfY = tyTop+760;
+    [tx, tx+tw].forEach(function(nx){
+        ctx.save();
+        ctx.beginPath(); ctx.arc(nx, perfY, 26, 0, Math.PI*2); ctx.closePath(); ctx.clip();
+        ccBg(ctx, W, H, d.theme.c1, d.theme.c2, true);
+        ctx.restore();
+    });
+    ctx.save();
+    ctx.strokeStyle = dark?'rgba(0,0,0,0.3)':'rgba(255,255,255,0.6)';
+    ctx.lineWidth=4; ctx.setLineDash([16,14]);
+    ctx.beginPath(); ctx.moveTo(tx+40, perfY); ctx.lineTo(tx+tw-40, perfY); ctx.stroke();
+    ctx.restore();
+
+    const cols=[[String(d.total),'WORKOUTS'],[String(d.streak),'STREAK'],[d.rate+'%','RATE']];
+    const colX=[tx+tw*0.22, tx+tw*0.5, tx+tw*0.78], sy=perfY+125;
+    ctx.strokeStyle=dark?'rgba(0,0,0,0.2)':'rgba(255,255,255,0.35)'; ctx.lineWidth=2;
+    [tx+tw*0.36, tx+tw*0.64].forEach(function(x){ ctx.beginPath(); ctx.moveTo(x,sy-34); ctx.lineTo(x,sy+44); ctx.stroke(); });
+    cols.forEach(function(c,i){
+        ctx.fillStyle=text; ctx.font='900 58px ' + font; ctx.fillText(c[0],colX[i],sy);
+        ctx.fillStyle=softText; ctx.font='700 22px ' + font; ctx.fillText(c[1],colX[i],sy+50);
+    });
+
+    ctx.fillStyle=softText; ctx.font='700 25px ' + font;
+    ctx.fillText('100 DAYS OF WORKOUT · ' + d.season.toUpperCase(), cx, tyTop+th-44);
 }
 
 function ccShareCaption() {
@@ -4418,49 +4615,62 @@ function ccShareCaption() {
     return `💯 I just completed 100 days of workouts!\n🏋️ ${total} workouts · 🔥 ${streak} day streak\n\n#100DaysWorkout #CenturyClub`;
 }
 
+// Convert a dataURL to a Blob synchronously (so navigator.share keeps the
+// user-activation — async toBlob breaks the gesture on iOS and share silently fails).
+function ccDataURLToBlob(dataUrl) {
+    const [head, b64] = dataUrl.split(',');
+    const mime = head.match(/:(.*?);/)[1];
+    const bin = atob(b64);
+    const len = bin.length;
+    const arr = new Uint8Array(len);
+    for (let i = 0; i < len; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type: mime });
+}
+
 function shareCenturyCard() {
     const canvas = $('cc-card-canvas');
     if (!canvas) return;
     persistCenturyCard();
 
-    canvas.toBlob(async (blob) => {
-        if (!blob) { showToast('Could not generate image', 'error'); return; }
-        const file = new File([blob], 'my-century-card.png', { type: 'image/png' });
+    let file;
+    try {
+        const blob = ccDataURLToBlob(canvas.toDataURL('image/png'));
+        file = new File([blob], 'my-century-card.png', { type: 'image/png' });
+    } catch (e) {
+        showToast('Could not generate image', 'error');
+        return;
+    }
 
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            try {
-                await navigator.share({ files: [file], text: ccShareCaption() });
-            } catch (e) {
-                // user cancelled — no-op
-            }
-        } else {
-            ccDownloadBlob(blob);
-            showToast('Image saved! Share it on WhatsApp 📲', 'success');
-        }
-    }, 'image/png');
+    // Try native file share (WhatsApp / Insta share sheet) within the gesture
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], text: ccShareCaption() }).catch(() => {});
+        return;
+    }
+    // Fallback: text-only share, else download
+    if (navigator.share) {
+        navigator.share({ text: ccShareCaption() }).catch(() => {});
+        ccDownloadCanvas(canvas);
+    } else {
+        ccDownloadCanvas(canvas);
+        showToast('Image saved! Share it on WhatsApp 📲', 'success');
+    }
 }
 
 function downloadCenturyCard() {
     const canvas = $('cc-card-canvas');
     if (!canvas) return;
     persistCenturyCard();
-    canvas.toBlob(blob => {
-        if (blob) {
-            ccDownloadBlob(blob);
-            showToast('Saved to your photos! 📸', 'success');
-        }
-    }, 'image/png');
+    ccDownloadCanvas(canvas);
+    showToast('Saved to your photos! 📸', 'success');
 }
 
-function ccDownloadBlob(blob) {
-    const url = URL.createObjectURL(blob);
+function ccDownloadCanvas(canvas) {
     const a = document.createElement('a');
-    a.href = url;
+    a.href = canvas.toDataURL('image/png');
     a.download = 'my-century-card.png';
     document.body.appendChild(a);
     a.click();
     a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // ---- Hall of Fame ----
