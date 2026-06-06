@@ -3677,23 +3677,37 @@ function showSpreadsheetView() {
 // ============================================
 // MODAL FUNCTIONS
 // ============================================
+let _bodyScrollY = 0;
+
+function lockBodyScroll() {
+    if (document.body.classList.contains('modal-open')) return;
+    _bodyScrollY = window.scrollY || window.pageYOffset || 0;
+    document.body.style.top = `-${_bodyScrollY}px`;
+    document.body.classList.add('modal-open');
+}
+
+function unlockBodyScroll() {
+    if (!document.body.classList.contains('modal-open')) return;
+    document.body.classList.remove('modal-open');
+    document.body.style.top = '';
+    window.scrollTo(0, _bodyScrollY);
+}
+
 function openModal(modalId) {
     const modal = $(modalId);
     if (modal) modal.classList.add('active');
-    document.body.classList.add('modal-open');
+    lockBodyScroll();
 }
 
 function closeModal(modalId) {
     const modal = $(modalId);
     if (modal) modal.classList.remove('active');
-    if (!document.querySelector('.modal.active')) {
-        document.body.classList.remove('modal-open');
-    }
+    if (!document.querySelector('.modal.active')) unlockBodyScroll();
 }
 
 function closeAnyModal() {
     document.querySelectorAll('.modal.active').forEach(m => m.classList.remove('active'));
-    document.body.classList.remove('modal-open');
+    unlockBodyScroll();
 }
 
 // ============================================
@@ -4641,19 +4655,18 @@ function shareCenturyCard() {
         return;
     }
 
-    // Try native file share (WhatsApp / Insta share sheet) within the gesture
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        navigator.share({ files: [file], text: ccShareCaption() }).catch(() => {});
+    const data = { files: [file], text: ccShareCaption() };
+    // Native file share (WhatsApp / Insta share sheet) — must stay in the gesture
+    if (navigator.share && (!navigator.canShare || navigator.canShare(data))) {
+        navigator.share(data).catch(() => {});
         return;
     }
-    // Fallback: text-only share, else download
+    // Fallbacks
     if (navigator.share) {
         navigator.share({ text: ccShareCaption() }).catch(() => {});
-        ccDownloadCanvas(canvas);
-    } else {
-        ccDownloadCanvas(canvas);
-        showToast('Image saved! Share it on WhatsApp 📲', 'success');
     }
+    ccDownloadCanvas(canvas);
+    showToast('Image saved — share it on WhatsApp 📲', 'success');
 }
 
 function downloadCenturyCard() {

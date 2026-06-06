@@ -5121,3 +5121,51 @@ body.modal-open .hamburger-btn { display: none; }
     background: var(--primary);
     color: #fff;
 }
+
+/* ============================================
+   CENTURY CLUB — scroll/layout fixes
+   ============================================ */
+/* Lock the page behind any open modal (kills background scroll bleed) */
+body.modal-open {
+    position: fixed;
+    left: 0;
+    right: 0;
+    width: 100%;
+    overflow: hidden;
+}
+
+/* Card builder sheet: header fixed, middle scrolls, card pinned top, actions pinned bottom */
+.cc-modal-content {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.cc-modal .modal-header { flex-shrink: 0; }
+
+.cc-builder-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;   /* stop scroll chaining to the page */
+    padding: 0;
+}
+
+/* Keep the live card visible while you tweak design/colour below */
+.cc-canvas-wrap {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    background: var(--gray-50);
+    box-shadow: 0 8px 14px -10px rgba(0,0,0,0.4);
+}
+.cc-card-canvas { max-height: 38vh; }
+
+/* Always-visible action buttons */
+.cc-builder-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 6;
+    background: #fff;
+    box-shadow: 0 -8px 18px -10px rgba(0,0,0,0.3);
+    padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+}
