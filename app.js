@@ -4129,11 +4129,30 @@ function loadCardPhoto(dataUrl, cb) {
 function handleCenturyPhoto(input) {
     const file = input.files[0];
     if (!file) return;
+    showToast('Adding your photo…', '');
     const reader = new FileReader();
     reader.onload = e => {
-        _cardPhotoDataUrl = e.target.result;
-        loadCardPhoto(_cardPhotoDataUrl, () => { refreshCardPreview(); persistCenturyCard(); });
+        const raw = new Image();
+        raw.onload = () => {
+            // Downscale + compress so it fits in localStorage and draws fast.
+            // Raw phone photos are several MB; we shrink to ~500px JPEG (~50KB).
+            const max = 600;
+            const scale = Math.min(1, max / Math.max(raw.width, raw.height));
+            const c = document.createElement('canvas');
+            c.width = Math.round(raw.width * scale);
+            c.height = Math.round(raw.height * scale);
+            c.getContext('2d').drawImage(raw, 0, 0, c.width, c.height);
+            try {
+                _cardPhotoDataUrl = c.toDataURL('image/jpeg', 0.82);
+            } catch (err) {
+                _cardPhotoDataUrl = e.target.result;
+            }
+            loadCardPhoto(_cardPhotoDataUrl, () => { refreshCardPreview(); persistCenturyCard(); });
+        };
+        raw.onerror = () => showToast("Couldn't read that image — try another", 'error');
+        raw.src = e.target.result;
     };
+    reader.onerror = () => showToast("Couldn't read that file", 'error');
     reader.readAsDataURL(file);
 }
 
@@ -4202,6 +4221,16 @@ function ccWrapLines(ctx, text, maxWidth) {
     return lines;
 }
 
+function ccFitFont(ctx, txt, weight, startPx, minPx, maxW, font) {
+    let s = startPx;
+    ctx.font = `${weight} ${s}px ${font}`;
+    while (ctx.measureText(txt).width > maxW && s > minPx) {
+        s -= 2;
+        ctx.font = `${weight} ${s}px ${font}`;
+    }
+    return s;
+}
+
 function refreshCardPreview() {
     const canvas = $('cc-card-canvas');
     if (!canvas) return;
@@ -4216,15 +4245,16 @@ function refreshCardPreview() {
     const currentDay = getCurrentDay();
     const rate = currentDay > 0 ? Math.round((total / currentDay) * 100) : 0;
 
-    const W = 1080, H = 1350;
+    const W = 1080, H = 1350, cx = W / 2;
     canvas.width = W;
     canvas.height = H;
     const ctx = canvas.getContext('2d');
     const font = "'Inter', -apple-system, 'Helvetica Neue', Arial, sans-serif";
     const text = theme.text;
     const dark = theme.text === '#1a1a1a';
-    const softText = dark ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.82)';
-    const panel = dark ? 'rgba(255,255,255,0.30)' : 'rgba(0,0,0,0.18)';
+    const softText = dark ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.85)';
+    const chipBg = dark ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.16)';
+    const lightInk = dark ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.95)';
 
     // Background gradient
     const g = ctx.createLinearGradient(0, 0, W, H);
@@ -4233,117 +4263,152 @@ function refreshCardPreview() {
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
 
+    // Soft bokeh glow circles for depth
+    ctx.save();
+    ctx.globalAlpha = 0.10;
+    ctx.fillStyle = '#ffffff';
+    [[-60, -40, 300], [W + 60, 220, 260], [-40, H - 120, 280], [W + 40, H + 40, 340]].forEach(([x, y, rr]) => {
+        ctx.beginPath(); ctx.arc(x, y, rr, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.restore();
+
+    // Confetti dots — lively but out of the text zone
+    const confetti = [
+        [70, 120, 16, '#ffd200'], [1000, 90, 20, '#ff5fa2'], [930, 250, 12, '#5fd0ff'],
+        [150, 300, 12, '#7CFFB2'], [60, 520, 10, '#ffffff'], [1025, 560, 12, '#ffd200'],
+        [90, 1180, 18, '#5fd0ff'], [1000, 1150, 16, '#ff5fa2'], [200, 1255, 13, '#ffd200'],
+        [880, 1270, 14, '#7CFFB2'], [1015, 1265, 9, '#ffffff'], [120, 1280, 9, '#ffffff'],
+    ];
+    ctx.save();
+    ctx.globalAlpha = 0.85;
+    confetti.forEach(([x, y, rr, col]) => {
+        ctx.fillStyle = col;
+        ctx.beginPath(); ctx.arc(x, y, rr, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.restore();
+
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    // Faint giant "100" watermark
+    // Top banner ribbon: CENTURY CLUB
+    const bannerTxt = '🏆  CENTURY CLUB';
+    ctx.font = `800 40px ${font}`;
+    const bw = ctx.measureText(bannerTxt).width + 80;
+    const bh = 76, by = 70;
     ctx.save();
-    ctx.globalAlpha = dark ? 0.12 : 0.10;
-    ctx.fillStyle = text;
-    ctx.font = `900 560px ${font}`;
-    ctx.fillText('100', W / 2, H * 0.52);
+    ccRoundRect(ctx, cx - bw / 2, by, bw, bh, bh / 2);
+    ctx.fillStyle = dark ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.22)';
+    ctx.fill();
+    ctx.fillStyle = lightInk;
+    ctx.fillText(bannerTxt, cx, by + bh / 2 + 2);
     ctx.restore();
 
-    // Photo / placeholder
-    const cx = W / 2, cy = 290, r = 125;
+    // Photo with ring + 💯 badge
+    const cy = 330, r = 135;
+    // glow ring
     ctx.save();
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.closePath();
-    ctx.lineWidth = 10;
-    ctx.strokeStyle = dark ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(cx, cy, r + 14, 0, Math.PI * 2);
+    ctx.fillStyle = dark ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.35)';
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.closePath();
     if (_cardPhotoImg) {
         ctx.save();
         ctx.clip();
-        // cover-fit the image into the circle
         const img = _cardPhotoImg;
-        const scale = Math.max((r * 2) / img.width, (r * 2) / img.height);
-        const dw = img.width * scale, dh = img.height * scale;
+        const sc = Math.max((r * 2) / img.width, (r * 2) / img.height);
+        const dw = img.width * sc, dh = img.height * sc;
         ctx.drawImage(img, cx - dw / 2, cy - dh / 2, dw, dh);
         ctx.restore();
-        ctx.stroke();
     } else {
-        ctx.fillStyle = dark ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.2)';
+        ctx.fillStyle = dark ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.22)';
         ctx.fill();
-        ctx.stroke();
-        ctx.font = '110px sans-serif';
-        ctx.fillText('💪', cx, cy + 6);
+        ctx.font = '120px sans-serif';
+        ctx.fillText('💪', cx, cy + 8);
     }
+    ctx.lineWidth = 12;
+    ctx.strokeStyle = dark ? 'rgba(0,0,0,0.4)' : '#ffffff';
+    ctx.stroke();
     ctx.restore();
 
-    // Title pill
-    ctx.font = `800 38px ${font}`;
+    // 💯 badge bottom-right of photo
+    const bx = cx + r * 0.72, byy = cy + r * 0.72;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(bx, byy, 54, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.font = '58px sans-serif';
+    ctx.fillText('💯', bx, byy + 4);
+    ctx.restore();
+
+    // Name (auto-fit)
+    ctx.fillStyle = text;
+    const nameSize = ccFitFont(ctx, user.name, '900', 78, 48, W - 160, font);
+    ctx.font = `900 ${nameSize}px ${font}`;
+    ctx.fillText(user.name, cx, 580);
+
+    // Funny title pill (auto-fit)
+    const titleSize = ccFitFont(ctx, title, '800', 40, 26, W - 200, font);
+    ctx.font = `800 ${titleSize}px ${font}`;
     const titleW = ctx.measureText(title).width;
-    const padX = 36, pillH = 70;
-    const pillW = titleW + padX * 2;
-    const pillY = 455;
+    const pillH = 72, pillW = titleW + 72, pillY = 632;
     ctx.save();
     ccRoundRect(ctx, cx - pillW / 2, pillY, pillW, pillH, pillH / 2);
-    ctx.fillStyle = dark ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.20)';
+    ctx.fillStyle = dark ? 'rgba(0,0,0,0.16)' : 'rgba(0,0,0,0.22)';
     ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = dark ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.5)';
-    ctx.stroke();
-    ctx.fillStyle = text;
+    ctx.fillStyle = lightInk;
+    ctx.font = `800 ${titleSize}px ${font}`;
     ctx.fillText(title, cx, pillY + pillH / 2 + 2);
     ctx.restore();
 
-    // Name
-    ctx.fillStyle = text;
-    ctx.font = `900 70px ${font}`;
-    ctx.fillText(user.name, cx, 600);
-
-    // CENTURY DONE
-    ctx.font = `800 46px ${font}`;
-    ctx.fillText('💯 CENTURY DONE', cx, 672);
-
-    // Proud moment panel
-    ctx.font = `italic 600 40px ${font}`;
-    const lines = ccWrapLines(ctx, '“' + proudRaw + '”', W - 220).slice(0, 3);
-    const lineH = 54;
-    const boxPadY = 34;
-    const boxH = lines.length * lineH + boxPadY * 2 - 14;
-    const boxW = W - 180;
-    const boxY = 740;
+    // Proud moment — speech-bubble style panel
+    ctx.font = `italic 600 42px ${font}`;
+    const lines = ccWrapLines(ctx, '“' + proudRaw + '”', W - 260).slice(0, 3);
+    const lineH = 56, boxPadY = 38;
+    const boxH = lines.length * lineH + boxPadY * 2 - 16;
+    const boxW = W - 200, boxY = 770;
     ctx.save();
-    ccRoundRect(ctx, cx - boxW / 2, boxY, boxW, boxH, 28);
-    ctx.fillStyle = panel;
+    ccRoundRect(ctx, cx - boxW / 2, boxY, boxW, boxH, 30);
+    ctx.fillStyle = dark ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.16)';
     ctx.fill();
     ctx.fillStyle = text;
     let ty = boxY + boxPadY + lineH / 2;
     lines.forEach(ln => { ctx.fillText(ln, cx, ty); ty += lineH; });
     ctx.restore();
 
-    // Stats row
-    const statsY = boxY + boxH + 110;
+    // Stat chips
+    const chipY = boxY + boxH + 50, chipH = 184, gap = 26;
+    const sideMargin = 60;
+    const chipW = (W - sideMargin * 2 - gap * 2) / 3;
     const cols = [
-        { num: String(total), lbl: 'WORKOUTS' },
-        { num: String(streak), lbl: 'DAY STREAK' },
-        { num: rate + '%', lbl: 'CONSISTENCY' },
+        { num: String(total), lbl: 'WORKOUTS', emo: '🏋️' },
+        { num: String(streak), lbl: 'DAY STREAK', emo: '🔥' },
+        { num: rate + '%', lbl: 'CONSISTENCY', emo: '🎯' },
     ];
-    const colX = [W * 0.25, W * 0.5, W * 0.75];
-    // separators
-    ctx.strokeStyle = dark ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.25)';
-    ctx.lineWidth = 2;
-    [W * 0.375, W * 0.625].forEach(x => {
-        ctx.beginPath();
-        ctx.moveTo(x, statsY - 40);
-        ctx.lineTo(x, statsY + 50);
-        ctx.stroke();
-    });
     cols.forEach((c, i) => {
+        const x = sideMargin + i * (chipW + gap);
+        ctx.save();
+        ccRoundRect(ctx, x, chipY, chipW, chipH, 26);
+        ctx.fillStyle = chipBg;
+        ctx.fill();
+        ctx.restore();
+        const ccx = x + chipW / 2;
         ctx.fillStyle = text;
-        ctx.font = `900 76px ${font}`;
-        ctx.fillText(c.num, colX[i], statsY - 8);
+        ctx.font = '40px sans-serif';
+        ctx.fillText(c.emo, ccx, chipY + 46);
+        ctx.font = `900 64px ${font}`;
+        ctx.fillText(c.num, ccx, chipY + 104);
         ctx.fillStyle = softText;
-        ctx.font = `700 26px ${font}`;
-        ctx.fillText(c.lbl, colX[i], statsY + 52);
+        ctx.font = `700 24px ${font}`;
+        ctx.fillText(c.lbl, ccx, chipY + 150);
     });
 
     // Footer
     ctx.fillStyle = softText;
     ctx.font = `600 28px ${font}`;
-    ctx.fillText('100 Days of Workout · ' + challengeSettings.seasonName, cx, H - 70);
+    ctx.fillText('100 Days of Workout · ' + challengeSettings.seasonName, cx, H - 60);
 }
 
 function ccShareCaption() {
