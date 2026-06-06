@@ -5195,3 +5195,22 @@ body.modal-open {
     transition: transform 0.12s, background 0.15s;
 }
 .cc-download-btn2:active { transform: scale(0.98); background: var(--gray-100); }
+
+/* ============================================
+   CENTURY CLUB — give the form more room
+   ============================================ */
+/* Smaller pinned preview */
+.cc-canvas-wrap { padding: 8px 14px 6px; }
+.cc-card-canvas { max-height: 30vh; }
+
+/* More room + breathing space in the scrollable middle */
+.cc-fun-form { padding: 12px 18px 16px; gap: 16px; }
+
+/* Compact, stacked action bar */
+.cc-builder-actions {
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+}
+.cc-share-btn { width: 100%; padding: 14px; font-size: 15px; }
+.cc-download-btn2 { width: 100%; padding: 12px; font-size: 14px; }
