@@ -3998,7 +3998,7 @@ function showCenturyClubCelebration() {
     if (!user) return;
 
     const total = calculateTotalWorkouts(user);
-    const streak = calculateStreak(user);
+    const streak = calculateBestStreak(user);
     const currentDay = getCurrentDay();
     const rate = currentDay > 0 ? Math.round((total / currentDay) * 100) : 0;
 
@@ -4274,7 +4274,7 @@ function ccCardData() {
         title: assignCenturyTitle(user),
         proud: ($('cc-proud-input') && $('cc-proud-input').value.trim()) || 'Showed up. Every. Single. Day.',
         total: total,
-        streak: calculateStreak(user),
+        streak: calculateBestStreak(user),
         rate: currentDay > 0 ? Math.round((total / currentDay) * 100) : 0,
         dark: theme.text === '#1a1a1a',
         font: "'Inter', -apple-system, 'Helvetica Neue', Arial, sans-serif",
@@ -4449,7 +4449,7 @@ function ccTplPop(ctx, W, H, d) {
 
     const chipY = boxY + boxH + 50, chipH = 184, gap = 26, sideMargin = 60;
     const chipW = (W - sideMargin*2 - gap*2)/3;
-    const cols = [{num:String(d.total),lbl:'WORKOUTS',emo:'🏋️'},{num:String(d.streak),lbl:'DAY STREAK',emo:'🔥'},{num:d.rate+'%',lbl:'CONSISTENCY',emo:'🎯'}];
+    const cols = [{num:String(d.total),lbl:'WORKOUTS',emo:'🏋️'},{num:String(d.streak),lbl:'BEST STREAK',emo:'🔥'},{num:d.rate+'%',lbl:'CONSISTENCY',emo:'🎯'}];
     cols.forEach(function(c,i){
         const x = sideMargin + i*(chipW+gap);
         ctx.save(); ccRoundRect(ctx, x, chipY, chipW, chipH, 26); ctx.fillStyle = chipBg; ctx.fill(); ctx.restore();
@@ -4510,7 +4510,7 @@ function ccTplBold(ctx, W, H, d) {
     ctx.fillStyle = softText;
     ctx.fillText('DAYS DONE', cx, 1090);
 
-    const cols=[[String(d.total),'WORKOUTS'],[String(d.streak),'STREAK'],[d.rate+'%','RATE']];
+    const cols=[[String(d.total),'WORKOUTS'],[String(d.streak),'BEST STREAK'],[d.rate+'%','RATE']];
     const colX=[W*0.27,W*0.5,W*0.73], sy=1205;
     ctx.strokeStyle = dark?'rgba(0,0,0,0.25)':'rgba(255,255,255,0.4)';
     ctx.lineWidth=2;
@@ -4566,7 +4566,7 @@ function ccTplPolaroid(ctx, W, H, d) {
     ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(px+pad, stripTop); ctx.lineTo(px+pw-pad, stripTop); ctx.stroke();
 
-    const cols=[[String(d.total),'WORKOUTS'],[String(d.streak),'DAY STREAK'],[d.rate+'%','CONSISTENCY']];
+    const cols=[[String(d.total),'WORKOUTS'],[String(d.streak),'BEST STREAK'],[d.rate+'%','CONSISTENCY']];
     const colX=[px+pw*0.25, px+pw*0.5, px+pw*0.75];
     // light separators
     ctx.strokeStyle = '#f1f1f2';
@@ -4626,7 +4626,7 @@ function ccTplTicket(ctx, W, H, d) {
     ctx.beginPath(); ctx.moveTo(tx+40, perfY); ctx.lineTo(tx+tw-40, perfY); ctx.stroke();
     ctx.restore();
 
-    const cols=[[String(d.total),'WORKOUTS'],[String(d.streak),'STREAK'],[d.rate+'%','RATE']];
+    const cols=[[String(d.total),'WORKOUTS'],[String(d.streak),'BEST STREAK'],[d.rate+'%','RATE']];
     const colX=[tx+tw*0.22, tx+tw*0.5, tx+tw*0.78], sy=perfY+125;
     ctx.strokeStyle=dark?'rgba(0,0,0,0.2)':'rgba(255,255,255,0.35)'; ctx.lineWidth=2;
     [tx+tw*0.36, tx+tw*0.64].forEach(function(x){ ctx.beginPath(); ctx.moveTo(x,sy-34); ctx.lineTo(x,sy+44); ctx.stroke(); });
@@ -4642,8 +4642,8 @@ function ccTplTicket(ctx, W, H, d) {
 function ccShareCaption() {
     const user = appState.currentUser;
     const total = calculateTotalWorkouts(user);
-    const streak = calculateStreak(user);
-    return `💯 I just completed 100 days of workouts!\n🏋️ ${total} workouts · 🔥 ${streak} day streak\n\n#100DaysWorkout #CenturyClub`;
+    const streak = calculateBestStreak(user);
+    return `💯 I just completed 100 days of workouts!\n🏋️ ${total} workouts · 🔥 ${streak} day best streak\n\n#100DaysWorkout #CenturyClub`;
 }
 
 // Convert a dataURL to a Blob synchronously (so navigator.share keeps the
@@ -4744,7 +4744,7 @@ function renderHallOfFame() {
         const club = p.centuryClub || {};
         const theme = CENTURY_THEMES[club.theme || 'cosmic'] || CENTURY_THEMES.cosmic;
         const total = calculateTotalWorkouts(p);
-        const streak = calculateStreak(p);
+        const streak = calculateBestStreak(p);
         const proudMoment = club.proudMoment || '100 days of showing up!';
         const title = club.title || assignCenturyTitle(p);
         const photoHTML = club.photo
