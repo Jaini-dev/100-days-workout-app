@@ -5214,3 +5214,118 @@ body.modal-open {
 }
 .cc-share-btn { width: 100%; padding: 14px; font-size: 15px; }
 .cc-download-btn2 { width: 100%; padding: 12px; font-size: 14px; }
+
+/* ============================================
+   CENTURY CLUB — swipeable compact form + bigger card
+   ============================================ */
+/* Bigger pinned card now the form is a single compact row */
+.cc-card-canvas { max-height: 46vh; }
+.cc-canvas-wrap { padding: 8px 14px 4px; }
+
+.cc-fun-form { padding: 8px 0 6px; gap: 6px; }
+.cc-fun-tip {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--gray-400);
+    margin: 0 0 2px;
+    letter-spacing: 0.2px;
+}
+
+/* Horizontal swipe carousel of input panels */
+.cc-carousel {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    gap: 10px;
+    padding: 2px 16px 4px;
+    scrollbar-width: none;
+}
+.cc-carousel::-webkit-scrollbar { display: none; }
+
+.cc-panel {
+    flex: 0 0 84%;
+    scroll-snap-align: center;
+    background: var(--gray-50);
+    border: 1.5px solid var(--gray-200);
+    border-radius: 16px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    min-height: 96px;
+    justify-content: center;
+}
+.cc-panel-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--gray-600);
+    letter-spacing: 0.2px;
+}
+
+.cc-photo-mini {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    border-radius: 12px;
+    border: 2px dashed #c4b5fd;
+    background: #faf5ff;
+    color: #6d28d9;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: center;
+}
+.cc-photo-mini:active { background: #f3e8ff; }
+
+.cc-proud-mini {
+    width: 100%;
+    padding: 11px 13px;
+    border: 2px solid var(--gray-200);
+    border-radius: 12px;
+    font-size: 15px;
+    font-family: inherit;
+    outline: none;
+    background: #fff;
+}
+.cc-proud-mini:focus { border-color: var(--primary); }
+
+/* Compact pills + dots inside panels */
+.cc-panel .cc-tpl-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.cc-panel .cc-tpl-pill {
+    padding: 6px 11px;
+    border-radius: 50px;
+    border: 2px solid var(--gray-200);
+    background: #fff;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--gray-600);
+    cursor: pointer;
+}
+.cc-panel .cc-tpl-pill.selected { border-color: var(--primary); background: var(--primary); color: #fff; }
+
+.cc-panel .cc-theme-dots { display: flex; gap: 12px; }
+.cc-panel .cc-theme-dot {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    border: 3px solid transparent;
+    box-shadow: 0 2px 7px rgba(0,0,0,0.2);
+    cursor: pointer;
+}
+.cc-panel .cc-theme-dot.selected { border-color: var(--gray-800); transform: scale(1.15); }
+
+/* Progress dots */
+.cc-dots { display: flex; justify-content: center; gap: 7px; padding: 6px 0 2px; }
+.cc-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--gray-300);
+    transition: all 0.2s;
+    cursor: pointer;
+}
+.cc-dot.active { background: var(--primary); width: 20px; border-radius: 4px; }
+
+/* Slightly smaller share button */
+.cc-share-btn { padding: 13px; font-size: 15px; }

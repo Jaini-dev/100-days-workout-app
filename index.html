@@ -834,41 +834,55 @@
             </div>
 
             <div class="cc-fun-form">
-                <p class="cc-fun-tip">👇 Make it yours, then blast it to the group</p>
+                <p class="cc-fun-tip">Swipe to set up your card →</p>
 
-                <!-- Photo upload -->
-                <label class="cc-fun-photo">
-                    <span class="cc-fun-photo-emoji">🤳</span>
-                    <span class="cc-fun-photo-text">Tap to add your photo</span>
-                    <input type="file" accept="image/*" onchange="handleCenturyPhoto(this)" hidden>
-                </label>
+                <div class="cc-carousel" id="cc-carousel" onscroll="ccSyncDots()">
+                    <!-- Photo -->
+                    <div class="cc-panel">
+                        <span class="cc-panel-label">📸 Add your photo</span>
+                        <label class="cc-photo-mini">
+                            <span id="cc-photo-status">Tap to choose a photo</span>
+                            <input type="file" accept="image/*" onchange="handleCenturyPhoto(this)" hidden>
+                        </label>
+                    </div>
 
-                <!-- Proud moment -->
-                <input id="cc-proud-input" class="cc-fun-input" type="text"
-                    maxlength="70" placeholder="💬 Brag a little… &quot;Never skipped leg day!&quot;"
-                    oninput="onProudInput()">
+                    <!-- Brag -->
+                    <div class="cc-panel">
+                        <span class="cc-panel-label">💬 Brag a little</span>
+                        <input id="cc-proud-input" class="cc-proud-mini" type="text"
+                            maxlength="70" placeholder="Never skipped leg day!"
+                            oninput="onProudInput()">
+                    </div>
 
-                <!-- Template / design picker -->
-                <div class="cc-tpl-row">
-                    <span class="cc-fun-vibe-label">Choose a design ✨</span>
-                    <div class="cc-tpl-pills">
-                        <div class="cc-tpl-pill selected" data-tpl="pop" onclick="selectCCTemplate(this)">🎉 Pop</div>
-                        <div class="cc-tpl-pill" data-tpl="bold" onclick="selectCCTemplate(this)">⬛ Bold</div>
-                        <div class="cc-tpl-pill" data-tpl="polaroid" onclick="selectCCTemplate(this)">📸 Polaroid</div>
-                        <div class="cc-tpl-pill" data-tpl="ticket" onclick="selectCCTemplate(this)">🎟️ Ticket</div>
+                    <!-- Design -->
+                    <div class="cc-panel">
+                        <span class="cc-panel-label">✨ Pick a design</span>
+                        <div class="cc-tpl-pills">
+                            <div class="cc-tpl-pill selected" data-tpl="pop" onclick="selectCCTemplate(this)">🎉 Pop</div>
+                            <div class="cc-tpl-pill" data-tpl="bold" onclick="selectCCTemplate(this)">⬛ Bold</div>
+                            <div class="cc-tpl-pill" data-tpl="polaroid" onclick="selectCCTemplate(this)">📸 Polaroid</div>
+                            <div class="cc-tpl-pill" data-tpl="ticket" onclick="selectCCTemplate(this)">🎟️ Ticket</div>
+                        </div>
+                    </div>
+
+                    <!-- Vibe -->
+                    <div class="cc-panel">
+                        <span class="cc-panel-label">🎨 Pick a vibe</span>
+                        <div class="cc-theme-dots">
+                            <div class="cc-theme-dot selected" data-theme="cosmic" onclick="selectCCTheme(this)" style="background:linear-gradient(135deg,#667eea,#764ba2)" title="Cosmic"></div>
+                            <div class="cc-theme-dot" data-theme="fire" onclick="selectCCTheme(this)" style="background:linear-gradient(135deg,#f7971e,#ffd200)" title="Fire"></div>
+                            <div class="cc-theme-dot" data-theme="ocean" onclick="selectCCTheme(this)" style="background:linear-gradient(135deg,#2193b0,#6dd5ed)" title="Ocean"></div>
+                            <div class="cc-theme-dot" data-theme="jungle" onclick="selectCCTheme(this)" style="background:linear-gradient(135deg,#11998e,#38ef7d)" title="Jungle"></div>
+                            <div class="cc-theme-dot" data-theme="sunset" onclick="selectCCTheme(this)" style="background:linear-gradient(135deg,#f953c6,#b91d73)" title="Sunset"></div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Vibe picker -->
-                <div class="cc-fun-vibe">
-                    <span class="cc-fun-vibe-label">Pick your vibe 🎨</span>
-                    <div class="cc-theme-dots">
-                        <div class="cc-theme-dot selected" data-theme="cosmic" onclick="selectCCTheme(this)" style="background:linear-gradient(135deg,#667eea,#764ba2)" title="Cosmic"></div>
-                        <div class="cc-theme-dot" data-theme="fire" onclick="selectCCTheme(this)" style="background:linear-gradient(135deg,#f7971e,#ffd200)" title="Fire"></div>
-                        <div class="cc-theme-dot" data-theme="ocean" onclick="selectCCTheme(this)" style="background:linear-gradient(135deg,#2193b0,#6dd5ed)" title="Ocean"></div>
-                        <div class="cc-theme-dot" data-theme="jungle" onclick="selectCCTheme(this)" style="background:linear-gradient(135deg,#11998e,#38ef7d)" title="Jungle"></div>
-                        <div class="cc-theme-dot" data-theme="sunset" onclick="selectCCTheme(this)" style="background:linear-gradient(135deg,#f953c6,#b91d73)" title="Sunset"></div>
-                    </div>
+                <div class="cc-dots" id="cc-dots">
+                    <span class="cc-dot active" onclick="ccGoPanel(0)"></span>
+                    <span class="cc-dot" onclick="ccGoPanel(1)"></span>
+                    <span class="cc-dot" onclick="ccGoPanel(2)"></span>
+                    <span class="cc-dot" onclick="ccGoPanel(3)"></span>
                 </div>
             </div>
 

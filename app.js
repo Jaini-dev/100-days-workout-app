@@ -4136,6 +4136,12 @@ function openCardBuilder() {
         el.classList.toggle('selected', el.dataset.tpl === savedTpl);
     });
 
+    // Reset photo status label + carousel to the first panel
+    ccSetPhotoStatus(!!_cardPhotoDataUrl);
+    const carousel = $('cc-carousel');
+    if (carousel) carousel.scrollLeft = 0;
+    ccSyncDots();
+
     openModal('card-builder-modal');
 
     // Load saved photo (if any) then draw
@@ -4148,6 +4154,30 @@ function openCardBuilder() {
     if (document.fonts && document.fonts.ready) {
         document.fonts.ready.then(refreshCardPreview);
     }
+}
+
+function ccSetPhotoStatus(hasPhoto) {
+    const el = $('cc-photo-status');
+    if (el) el.textContent = hasPhoto ? '✓ Photo added — tap to change' : 'Tap to choose a photo';
+}
+
+// Sync the little progress dots to the carousel scroll position
+function ccSyncDots() {
+    const c = $('cc-carousel');
+    const dots = document.querySelectorAll('#cc-dots .cc-dot');
+    if (!c || !dots.length) return;
+    const panels = c.querySelectorAll('.cc-panel');
+    if (panels.length < 2) return;
+    const step = panels[1].offsetLeft - panels[0].offsetLeft;
+    const idx = Math.max(0, Math.min(dots.length - 1, Math.round(c.scrollLeft / step)));
+    dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+}
+
+function ccGoPanel(i) {
+    const c = $('cc-carousel');
+    if (!c) return;
+    const panels = c.querySelectorAll('.cc-panel');
+    if (panels[i]) c.scrollTo({ left: panels[i].offsetLeft - panels[0].offsetLeft, behavior: 'smooth' });
 }
 
 function loadCardPhoto(dataUrl, cb) {
@@ -4177,7 +4207,7 @@ function handleCenturyPhoto(input) {
             } catch (err) {
                 _cardPhotoDataUrl = e.target.result;
             }
-            loadCardPhoto(_cardPhotoDataUrl, () => { refreshCardPreview(); persistCenturyCard(); });
+            loadCardPhoto(_cardPhotoDataUrl, () => { refreshCardPreview(); persistCenturyCard(); ccSetPhotoStatus(true); });
         };
         raw.onerror = () => showToast("Couldn't read that image — try another", 'error');
         raw.src = e.target.result;
