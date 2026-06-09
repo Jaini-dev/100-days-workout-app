@@ -1467,6 +1467,7 @@ function updateDashboard() {
     if (calculateTotalWorkouts(user) >= 100 && !user.centuryClub?.unlockedAt) {
         setTimeout(checkCenturyClubUnlock, 1500);
     }
+    renderCenturyBanner();
 
     const currentDay = getCurrentDay();
     const daysLeft = getDaysLeft();
@@ -3993,6 +3994,28 @@ function checkCenturyClubUnlock() {
     showCenturyClubCelebration();
 }
 
+// Dashboard banner: a persistent way for completers to make/share their card
+// later if they didn't do it from the popup. Hidden once they've shared.
+function renderCenturyBanner() {
+    const el = $('century-banner');
+    if (!el) return;
+    const user = appState.currentUser;
+    if (!user) { el.style.display = 'none'; return; }
+    const cc = user.centuryClub || {};
+    if (calculateTotalWorkouts(user) >= 100 && !cc.shared) {
+        el.style.display = '';
+        el.innerHTML = `
+            <div class="cb-emoji">🎉</div>
+            <div class="cb-text">
+                <strong>You hit 100 days!</strong>
+                <span>Create &amp; share your Century Club card</span>
+            </div>
+            <div class="cb-arrow">→</div>`;
+    } else {
+        el.style.display = 'none';
+    }
+}
+
 function showCenturyClubCelebration() {
     const user = appState.currentUser;
     if (!user) return;
@@ -4705,6 +4728,15 @@ function shareCenturyCard() {
     };
 
     persistCenturyCard();
+    // Mark as shared so the dashboard banner / nudges stop appearing
+    const u = appState.currentUser;
+    if (u && u.centuryClub) {
+        u.centuryClub.shared = true;
+        const i = appState.participants.findIndex(p => p.phone === u.phone);
+        if (i >= 0) appState.participants[i].centuryClub = u.centuryClub;
+        saveData();
+        renderCenturyBanner();
+    }
 
     let file;
     try {

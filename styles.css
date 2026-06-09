@@ -5329,3 +5329,26 @@ body.modal-open {
 
 /* Slightly smaller share button */
 .cc-share-btn { padding: 13px; font-size: 15px; }
+
+/* ============================================
+   CENTURY CLUB — dashboard "make your card" banner
+   ============================================ */
+.century-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(99,102,241,0.4);
+    animation: cc-pop 0.5s cubic-bezier(0.34,1.56,0.64,1);
+}
+.century-banner:active { transform: scale(0.99); }
+.century-banner .cb-emoji { font-size: 30px; line-height: 1; }
+.century-banner .cb-text { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.century-banner .cb-text strong { font-size: 16px; font-weight: 800; }
+.century-banner .cb-text span { font-size: 13px; opacity: 0.9; }
+.century-banner .cb-arrow { font-size: 22px; font-weight: 800; opacity: 0.9; }
