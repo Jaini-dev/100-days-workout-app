@@ -535,6 +535,7 @@ function _buildParticipant(row, checkinRows) {
         _profilePhotoPath: row.profile_photo_url || null,
         profilePhotoUrl: null, // resolved to signed URL in supabaseLogin
         seasonSetup: row.season_setup || {},
+        passwordHash: row.password_hash || null,
         isAdmin: row.is_admin || false,
         isSuperAdmin: row.is_super_admin || false,
         joinDate: row.join_date || null,
@@ -551,6 +552,7 @@ async function supabaseRegister(userData) {
         commitment: userData.commitment || '',
         timezone: userData.timezone || 'Asia/Kolkata',
         join_date: getTodayString(),
+        password_hash: userData.passwordHash || null,
     }, { onConflict: 'phone', ignoreDuplicates: false });
     if (error) return { success: false, error: error.message };
     return { success: true };
@@ -844,6 +846,36 @@ window.skipS7Setup = function() {
 // ============================================
 // CHECKIN PHOTO UPLOAD
 // ============================================
+// SIGNED URL CACHE (session-level, avoids re-signing on every calendar render)
+const _signedUrlCache = {};
+async function getCachedSignedUrl(bucket, path) {
+    const cached = _signedUrlCache[path];
+    if (cached && cached.expiry > Date.now()) return cached.url;
+    const { data } = await getSB().storage.from(bucket).createSignedUrl(path, 7 * 24 * 3600);
+    if (data?.signedUrl) {
+        _signedUrlCache[path] = { url: data.signedUrl, expiry: Date.now() + 6 * 24 * 3600 * 1000 };
+        return data.signedUrl;
+    }
+    return null;
+}
+
+async function _applyCalendarPhotos() {
+    const els = document.querySelectorAll('.cal-day[data-photo-path]');
+    if (!els.length) return;
+    const paths = [...new Set([...els].map(el => el.dataset.photoPath))];
+    const uncached = paths.filter(p => !(_signedUrlCache[p]?.expiry > Date.now()));
+    if (uncached.length > 0) {
+        const { data: signedList } = await getSB().storage.from(CONFIG.CHECKIN_PHOTO_BUCKET).createSignedUrls(uncached, 7 * 24 * 3600);
+        (signedList || []).forEach(item => {
+            if (item.signedUrl) _signedUrlCache[item.path] = { url: item.signedUrl, expiry: Date.now() + 6 * 24 * 3600 * 1000 };
+        });
+    }
+    els.forEach(el => {
+        const url = _signedUrlCache[el.dataset.photoPath]?.url;
+        if (url) el.style.backgroundImage = `url('${url}')`;
+    });
+}
+
 let _checkinPhotoDate = null;
 
 window.triggerCheckinPhoto = function() { $('wds-photo-input')?.click(); };
@@ -869,6 +901,7 @@ window.onCheckinPhotoChange = async function(input) {
         if (!user.checkinDetails[date]) user.checkinDetails[date] = {};
         user.checkinDetails[date].photo = path;
         const { data: sd } = await sb.storage.from(CONFIG.CHECKIN_PHOTO_BUCKET).createSignedUrl(path, 7 * 24 * 3600);
+        if (sd?.signedUrl) _signedUrlCache[path] = { url: sd.signedUrl, expiry: Date.now() + 6 * 24 * 3600 * 1000 };
         const preview = $('wds-photo-preview');
         if (preview && sd?.signedUrl) {
             preview.style.backgroundImage = `url('${sd.signedUrl}')`;
@@ -1472,6 +1505,17 @@ async function handleLogin() {
     const result = await supabaseLogin(phone);
     if (result.success) {
         const user = result.data.user;
+        const inputHash = hashPassword(password);
+        if (user.passwordHash && user.passwordHash !== inputHash) {
+            hideLoading();
+            showToast('Incorrect password', 'error');
+            return;
+        }
+        // First login after password feature was added — save the password
+        if (!user.passwordHash) {
+            user.passwordHash = inputHash;
+            getSB().from('participants').update({ password_hash: inputHash }).eq('phone', phone).then(() => {});
+        }
         appState.currentUser = user;
         appState.participants = result.data.participants;
         appState.isAdmin = user.isAdmin || false;
@@ -1611,7 +1655,7 @@ async function handleUserRegistration() {
 
     showLoading();
 
-    const regResult = await supabaseRegister({ name, phone, goal, commitment });
+    const regResult = await supabaseRegister({ name, phone, goal, commitment, passwordHash: hashPassword(password) });
     if (!regResult.success) {
         hideLoading();
         showToast(regResult.error || 'Registration failed', 'error');
@@ -3487,10 +3531,13 @@ function renderCalendar() {
             const clickable = canEdit ? 'clickable' : '';
             const onClick = clickable ? `onclick="openDayEditor('${dateStr}', '${checkin || ''}')"` : '';
             const details = checkin === 'Y' ? ((user.checkinDetails || {})[dateStr] || null) : null;
-            const detailBadge = details?.type ? `<span class="cal-detail-icon" title="${details.type}">${getWorkoutTypeIcon(details.type)}</span>` : '';
+            const detailBadge = details?.type && !details?.photo ? `<span class="cal-detail-icon" title="${details.type}">${getWorkoutTypeIcon(details.type)}</span>` : '';
+            const hasPhoto = !!(details?.photo);
+            const photoAttr = hasPhoto ? `data-photo-path="${details.photo}"` : '';
+            const photoClass = hasPhoto ? ' has-photo' : '';
 
             html += `
-                <div class="cal-day ${statusClass} ${clickable}" ${onClick} title="Day ${i + 1} - ${formatShortDate(date)}${details ? ' — ' + details.type : ''}">
+                <div class="cal-day ${statusClass}${photoClass} ${clickable}" ${onClick} ${photoAttr} title="Day ${i + 1} - ${formatShortDate(date)}${details?.type ? ' — ' + details.type : ''}">
                     <span class="cal-date">${date.getDate()}</span>
                     ${detailBadge}
                 </div>
@@ -3538,6 +3585,8 @@ function renderCalendar() {
     `;
 
     container.innerHTML = html;
+    // Async: fill in photo backgrounds after HTML is set
+    _applyCalendarPhotos();
 }
 
 function quickLogFromCalendar(dateStr) {

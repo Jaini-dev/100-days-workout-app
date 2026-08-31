@@ -6286,3 +6286,32 @@ body.modal-open {
     transition: background 0.2s;
 }
 .dark-toggle-btn:hover { background: var(--gray-200); }
+
+/* ============================================
+   CALENDAR PHOTO BACKGROUNDS
+   ============================================ */
+.cal-day.has-photo {
+    background-size: cover;
+    background-position: center;
+    position: relative;
+    overflow: hidden;
+}
+.cal-day.has-photo::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.45) 100%);
+    border-radius: inherit;
+    pointer-events: none;
+}
+.cal-day.has-photo .cal-date {
+    position: relative;
+    z-index: 1;
+    color: #fff;
+    font-weight: 700;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+}
+.cal-day.has-photo .cal-detail-icon {
+    position: relative;
+    z-index: 1;
+}
