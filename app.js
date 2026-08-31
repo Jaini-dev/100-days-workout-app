@@ -9,8 +9,8 @@
 // ============================================
 const CONFIG = {
     SEASON: 'Season 7',
-    STORAGE_KEY: 'workout100_data_v5',
-    VERSION: '6.0.0',
+    STORAGE_KEY: 'workout100_data_v6',
+    VERSION: '7.0.0',
     SUPER_ADMIN_CODE_HASH: '31a82b',
     MAX_PAST_DAYS: 7,
     AUTO_BACKUP_INTERVAL: 24 * 60 * 60 * 1000,
@@ -18,7 +18,8 @@ const CONFIG = {
     TOP_RANKS_VISIBLE: 5,
     SUPABASE_URL: 'https://djyzaoisfslgkkfmgzuy.supabase.co',
     SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqeXphb2lzZnNsZ2trZm1nenV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NjI0NjgsImV4cCI6MjA5MDQzODQ2OH0.YC5FQjZGn1a8wMaE8ykMlOHBURNACrZRiBDtXd-TLjw',
-    PHOTO_BUCKET: 'profile-photos',
+    PHOTO_BUCKET: '100days-profile-photos',
+    CHECKIN_PHOTO_BUCKET: '100days-checkin-photos',
     MAX_PHOTO_BYTES: 200 * 1024,
 };
 
@@ -858,13 +859,13 @@ window.onCheckinPhotoChange = async function(input) {
         const date = _checkinPhotoDate || getTodayString();
         const sb = getSB();
         const path = `${user.phone}/${date}.jpg`;
-        const { error } = await sb.storage.from('checkin-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+        const { error } = await sb.storage.from(CONFIG.CHECKIN_PHOTO_BUCKET).upload(path, blob, { contentType: 'image/jpeg', upsert: true });
         if (error) { showToast('Photo upload failed', 'error'); hideLoading(); return; }
         if (!user.checkinDetails) user.checkinDetails = {};
         if (!user.checkinDetails[date]) user.checkinDetails[date] = {};
         user.checkinDetails[date].photo = path;
         // Show preview in sheet
-        const { data: sd } = await sb.storage.from('checkin-photos').createSignedUrl(path, 7 * 24 * 3600);
+        const { data: sd } = await sb.storage.from(CONFIG.CHECKIN_PHOTO_BUCKET).createSignedUrl(path, 7 * 24 * 3600);
         const preview = $('wds-photo-preview');
         const btn = $('wds-photo-btn');
         if (preview && sd?.signedUrl) {
@@ -2022,7 +2023,7 @@ function showWorkoutDetailsSheet(dateStr) {
     if (preview) { preview.style.display = 'none'; preview.style.backgroundImage = ''; }
     if (photoBtn) { photoBtn.textContent = '📸 Add Photo'; photoBtn.classList.remove('has-photo'); }
     if (existingPhoto) {
-        getSB().storage.from('checkin-photos').createSignedUrl(existingPhoto, 7 * 24 * 3600).then(({ data }) => {
+        getSB().storage.from(CONFIG.CHECKIN_PHOTO_BUCKET).createSignedUrl(existingPhoto, 7 * 24 * 3600).then(({ data }) => {
             if (data?.signedUrl && preview) {
                 preview.style.backgroundImage = `url('${data.signedUrl}')`;
                 preview.style.display = 'block';
