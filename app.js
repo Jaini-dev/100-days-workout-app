@@ -852,7 +852,11 @@ window.onCheckinPhotoChange = async function(input) {
     const file = input.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) { showToast('Images only please', 'error'); return; }
-    showLoading();
+
+    const btn = $('wds-photo-btn');
+    const prevText = btn?.textContent || '📸 Add Photo';
+    if (btn) { btn.textContent = '⏳ Uploading...'; btn.disabled = true; }
+
     try {
         const blob = await compressImage(file, CONFIG.MAX_PHOTO_BYTES);
         const user = appState.currentUser;
@@ -860,26 +864,24 @@ window.onCheckinPhotoChange = async function(input) {
         const sb = getSB();
         const path = `${user.phone}/${date}.jpg`;
         const { error } = await sb.storage.from(CONFIG.CHECKIN_PHOTO_BUCKET).upload(path, blob, { contentType: 'image/jpeg', upsert: true });
-        if (error) { showToast('Photo upload failed', 'error'); hideLoading(); return; }
+        if (error) { showToast('Photo upload failed', 'error'); if (btn) { btn.textContent = prevText; btn.disabled = false; } return; }
         if (!user.checkinDetails) user.checkinDetails = {};
         if (!user.checkinDetails[date]) user.checkinDetails[date] = {};
         user.checkinDetails[date].photo = path;
-        // Show preview in sheet
         const { data: sd } = await sb.storage.from(CONFIG.CHECKIN_PHOTO_BUCKET).createSignedUrl(path, 7 * 24 * 3600);
         const preview = $('wds-photo-preview');
-        const btn = $('wds-photo-btn');
         if (preview && sd?.signedUrl) {
             preview.style.backgroundImage = `url('${sd.signedUrl}')`;
             preview.style.display = 'block';
         }
-        if (btn) { btn.textContent = '📸 Change Photo'; btn.classList.add('has-photo'); }
+        if (btn) { btn.textContent = '📸 Change Photo'; btn.classList.add('has-photo'); btn.disabled = false; }
         supabaseSaveProfile(user).catch(() => {});
         saveData();
         showToast('Photo added! 📸', 'success');
     } catch (e) {
         showToast(e.message || 'Upload failed', 'error');
+        if (btn) { btn.textContent = prevText; btn.disabled = false; }
     }
-    hideLoading();
     input.value = '';
 };
 
