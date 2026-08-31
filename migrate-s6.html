@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Season 6 → Supabase Migration</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; background: #f3f4f6; color: #1f2937; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  p.sub { color: #6b7280; font-size: 14px; margin-bottom: 24px; }
+  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  input { width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 15px; margin-bottom: 16px; }
+  button { background: #6366f1; color: #fff; border: none; border-radius: 8px; padding: 12px 24px; font-size: 15px; font-weight: 600; cursor: pointer; width: 100%; }
+  button:disabled { background: #a5b4fc; cursor: not-allowed; }
+  #log { margin-top: 24px; background: #fff; border-radius: 10px; padding: 16px; font-size: 13px; max-height: 400px; overflow-y: auto; border: 1px solid #e5e7eb; }
+  .log-ok  { color: #16a34a; margin: 2px 0; }
+  .log-err { color: #dc2626; margin: 2px 0; }
+  .log-info { color: #6366f1; margin: 2px 0; }
+  #progress-bar-wrap { background: #e5e7eb; border-radius: 6px; height: 8px; margin-top: 16px; display: none; }
+  #progress-bar { background: #6366f1; height: 8px; border-radius: 6px; width: 0%; transition: width 0.3s; }
+  #done-banner { display: none; background: #dcfce7; border: 1px solid #86efac; border-radius: 10px; padding: 16px; margin-top: 16px; color: #15803d; font-weight: 600; text-align: center; }
+</style>
+</head>
+<body>
+
+<h1>Season 6 → Supabase Migration</h1>
+<p class="sub">Migrates all Season 6 participant data and checkins into Supabase.<br>Run this <strong>once</strong> before Season 7 starts.</p>
+
+<label for="phone">Your phone number (must be an existing participant)</label>
+<input type="tel" id="phone" placeholder="e.g. 9876543210">
+
+<button id="start-btn" onclick="startMigration()">Start Migration</button>
+
+<div id="progress-bar-wrap"><div id="progress-bar"></div></div>
+<div id="log"></div>
+<div id="done-banner">✅ Migration complete! All Season 6 data is now in Supabase.</div>
+
+<script>
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbz7oWHMpsI_jHb7kjsjtCJGclLXlANndjDdYAzeE0PUcbp7yLenJDSfCMWoMiDehe9O/exec';
+const SB_URL  = 'https://djyzaoisfslgkkfmgzuy.supabase.co';
+const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqeXphb2lzZnNsZ2trZm1nenV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NjI0NjgsImV4cCI6MjA5MDQzODQ2OH0.YC5FQjZGn1a8wMaE8ykMlOHBURNACrZRiBDtXd-TLjw';
+
+const sb = supabase.createClient(SB_URL, SB_KEY);
+
+const logEl = document.getElementById('log');
+function log(msg, type = 'info') {
+  const p = document.createElement('p');
+  p.className = 'log-' + type;
+  p.textContent = msg;
+  logEl.appendChild(p);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function setProgress(pct) {
+  document.getElementById('progress-bar-wrap').style.display = 'block';
+  document.getElementById('progress-bar').style.width = pct + '%';
+}
+
+async function gasPost(body) {
+  const r = await fetch(GAS_URL, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  return r.json();
+}
+
+async function startMigration() {
+  const phone = document.getElementById('phone').value.trim();
+  if (!phone) { alert('Enter your phone number first.'); return; }
+  document.getElementById('start-btn').disabled = true;
+  logEl.innerHTML = '';
+
+  // Step 1: login to fetch all participants
+  log('Connecting to Season 6 data…', 'info');
+  let loginData;
+  try {
+    loginData = await gasPost({ action: 'login', phone });
+  } catch (e) {
+    log('Failed to reach Google Apps Script: ' + e.message, 'err');
+    document.getElementById('start-btn').disabled = false;
+    return;
+  }
+
+  if (!loginData.success) {
+    log('Login failed: ' + (loginData.error || 'unknown error'), 'err');
+    document.getElementById('start-btn').disabled = false;
+    return;
+  }
+
+  const participants = loginData.data.participants || [];
+  log(`Found ${participants.length} participants in Season 6.`, 'ok');
+
+  // Step 2: for each participant, fetch checkins if missing
+  for (let i = 0; i < participants.length; i++) {
+    const p = participants[i];
+    setProgress(Math.round((i / participants.length) * 60));
+
+    if (!p.checkins || Object.keys(p.checkins).length === 0) {
+      log(`Fetching checkins for ${p.name}…`, 'info');
+      try {
+        const ciData = await gasPost({
+          action: 'getParticipantCheckins',
+          phone,
+          targetPhone: p.phone,
+          targetId: p.id || '',
+        });
+        if (ciData.success && ciData.data?.checkins) {
+          p.checkins = ciData.data.checkins;
+        }
+      } catch (e) {
+        log(`  Could not fetch checkins for ${p.name}: ${e.message}`, 'err');
+      }
+    }
+  }
+
+  // Step 3: upsert participants into Supabase (don't overwrite if already registered for S7)
+  log('Inserting participants into Supabase…', 'info');
+  for (let i = 0; i < participants.length; i++) {
+    const p = participants[i];
+    setProgress(60 + Math.round((i / participants.length) * 20));
+
+    const { error } = await sb.from('participants').upsert({
+      phone:      p.phone,
+      name:       p.name,
+      goal:       p.goal || '',
+      commitment: p.commitment || '',
+      timezone:   p.timezone || 'Asia/Kolkata',
+      is_admin:   p.isAdmin || false,
+      is_super_admin: p.isSuperAdmin || false,
+      join_date:  p.joinDate || null,
+    }, { onConflict: 'phone', ignoreDuplicates: true }); // skip if already in S7
+
+    if (error) {
+      log(`  Error inserting ${p.name}: ${error.message}`, 'err');
+    } else {
+      log(`  ✓ ${p.name} (${p.phone})`, 'ok');
+    }
+  }
+
+  // Step 4: upsert checkins into Supabase (only S6 dates, skip existing)
+  log('Inserting Season 6 checkins…', 'info');
+  let totalCheckins = 0;
+  for (let i = 0; i < participants.length; i++) {
+    const p = participants[i];
+    setProgress(80 + Math.round((i / participants.length) * 18));
+    if (!p.checkins) continue;
+
+    const rows = Object.entries(p.checkins)
+      .filter(([date, status]) => {
+        return (status === 'Y' || status === 'N' || status === 'R')
+          && date >= '2026-02-01' && date <= '2026-07-31';
+      })
+      .map(([date, status]) => ({ phone: p.phone, date, status }));
+
+    if (rows.length === 0) continue;
+
+    const { error } = await sb.from('checkins').upsert(rows, {
+      onConflict: 'phone,date',
+      ignoreDuplicates: true, // never overwrite S7 data
+    });
+
+    if (error) {
+      log(`  Error inserting checkins for ${p.name}: ${error.message}`, 'err');
+    } else {
+      totalCheckins += rows.length;
+    }
+  }
+
+  setProgress(100);
+  log(`Done! Inserted ${totalCheckins} Season 6 checkin records.`, 'ok');
+  document.getElementById('done-banner').style.display = 'block';
+  document.getElementById('start-btn').textContent = 'Migration Complete';
+}
+</script>
+</body>
+</html>

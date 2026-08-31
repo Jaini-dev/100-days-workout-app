@@ -583,6 +583,20 @@ async function supabaseLogin(phone) {
     const participants = (allRows || []).map(r => _buildParticipant(r, checkinsByPhone[r.phone]));
     const user = participants.find(p => p.phone === phone) || _buildParticipant(userRow, checkinsByPhone[phone]);
 
+    // Fetch Season 6 stats for the logged-in user
+    const { data: s6Rows } = await sb.from('checkins').select('date,status')
+        .eq('phone', phone).gte('date', '2026-02-01').lte('date', '2026-07-31');
+    if (s6Rows && s6Rows.length > 0) {
+        const yDates = s6Rows.filter(r => r.status === 'Y').map(r => r.date).sort();
+        let best = 0, curr = 0, prev = null;
+        for (const d of yDates) {
+            curr = (prev && (new Date(d) - new Date(prev)) / 86400000 === 1) ? curr + 1 : 1;
+            best = Math.max(best, curr);
+            prev = d;
+        }
+        user.lastSeason = { season: 'Season 6', days: yDates.length, bestStreak: best };
+    }
+
     return { success: true, data: { user, participants } };
 }
 
@@ -1622,8 +1636,8 @@ function updateDashboard() {
     const currentDay = getCurrentDay();
     const daysLeft = getDaysLeft();
 
-    // Calculate total workouts early (needed for badge and stats)
-    const totalWorkouts = Object.values(user.checkins || {}).filter(v => v === 'Y').length;
+    // Calculate total workouts early (needed for badge and stats) — season-filtered
+    const totalWorkouts = calculateTotalWorkouts(user);
 
     // User name with admin badge
     const nameEl = $('user-name');
@@ -1770,7 +1784,32 @@ function updateDashboard() {
     // Show goal reminder occasionally
     showGoalReminder();
 
+    // Last season recap card
+    renderLastSeasonCard(user);
+
     saveData();
+}
+
+function renderLastSeasonCard(user) {
+    const el = $('last-season-card');
+    if (!el) return;
+    const ls = user && user.lastSeason;
+    if (!ls || ls.days === 0) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    el.innerHTML = `
+        <div class="ls-label">🏅 ${ls.season} Recap</div>
+        <div class="ls-stats">
+            <div class="ls-stat">
+                <span class="ls-num">${ls.days}</span>
+                <span class="ls-unit">days completed</span>
+            </div>
+            <div class="ls-divider"></div>
+            <div class="ls-stat">
+                <span class="ls-num">${ls.bestStreak}</span>
+                <span class="ls-unit">best streak 🔥</span>
+            </div>
+        </div>
+    `;
 }
 
 function renderWeeklyGoal() {
