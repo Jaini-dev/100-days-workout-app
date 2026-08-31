@@ -587,7 +587,7 @@ async function supabaseLogin(phone) {
     // Resolve profile photo paths → signed URLs (private bucket, 1-hour expiry)
     const photoPaths = participants.filter(p => p._profilePhotoPath).map(p => p._profilePhotoPath);
     if (photoPaths.length > 0) {
-        const { data: signedList } = await sb.storage.from(CONFIG.PHOTO_BUCKET).createSignedUrls(photoPaths, 3600);
+        const { data: signedList } = await sb.storage.from(CONFIG.PHOTO_BUCKET).createSignedUrls(photoPaths, 7 * 24 * 3600);
         const urlMap = {};
         (signedList || []).forEach(item => { if (item.signedUrl) urlMap[item.path] = item.signedUrl; });
         participants.forEach(p => {
@@ -728,7 +728,7 @@ async function uploadProfilePhoto(file) {
         const { error: upErr } = await sb.storage.from(CONFIG.PHOTO_BUCKET)
             .upload(path, blob, { contentType: 'image/jpeg', upsert: true });
         if (upErr) { showToast('Photo upload failed', 'error'); return; }
-        const { data: signedData } = await sb.storage.from(CONFIG.PHOTO_BUCKET).createSignedUrl(path, 3600);
+        const { data: signedData } = await sb.storage.from(CONFIG.PHOTO_BUCKET).createSignedUrl(path, 7 * 24 * 3600);
         const url = signedData?.signedUrl || null;
         appState.currentUser._profilePhotoPath = path;
         appState.currentUser.profilePhotoUrl = url;
