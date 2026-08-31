@@ -2892,6 +2892,11 @@ body.modal-open .hamburger-btn { display: none; }
 /* ============================================
    ADMIN DASHBOARD
    ============================================ */
+/* Keep admin content clear of the floating menu button */
+#admin-dashboard-screen .container {
+    padding-bottom: 96px;
+}
+
 .admin-stats-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -2901,22 +2906,25 @@ body.modal-open .hamburger-btn { display: none; }
 
 .admin-stat-card {
     background: var(--bg-card);
-    border-radius: 12px;
-    padding: 12px;
+    border-radius: 14px;
+    padding: 14px 10px;
     text-align: center;
     box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border-color);
 }
 
+/* Colored stat cards - saturated accent color on a tinted background (works both themes) */
 .admin-stat-card.green {
     background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+    border-color: transparent;
 }
-
 .admin-stat-card.red {
     background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%);
+    border-color: transparent;
 }
-
 .admin-stat-card.yellow {
     background: linear-gradient(135deg, #fefce8 0%, #fef08a 100%);
+    border-color: transparent;
 }
 
 .admin-stat-icon {
@@ -2927,17 +2935,29 @@ body.modal-open .hamburger-btn { display: none; }
 .admin-stat-value {
     font-size: 24px;
     font-weight: 800;
-    color: var(--gray-800);
+    color: var(--text-primary);
+    line-height: 1.1;
 }
 
 .admin-stat-label {
     font-size: 10px;
-    color: var(--gray-500);
+    color: var(--text-secondary);
     text-transform: uppercase;
+    font-weight: 600;
+    margin-top: 2px;
 }
 
+/* Colored cards keep dark, readable text/labels in BOTH themes (backgrounds stay light) */
+.admin-stat-card.green .admin-stat-value { color: #15803d; }
+.admin-stat-card.red .admin-stat-value { color: #b91c1c; }
+.admin-stat-card.yellow .admin-stat-value { color: #a16207; }
+.admin-stat-card.green .admin-stat-label,
+.admin-stat-card.red .admin-stat-label,
+.admin-stat-card.yellow .admin-stat-label { color: #475569; }
+
 .admin-share-section {
-    background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+    background: var(--bg-subtle);
+    border: 1px solid var(--border-color);
     border-radius: 16px;
     padding: 16px;
     margin-bottom: 20px;
@@ -2946,7 +2966,7 @@ body.modal-open .hamburger-btn { display: none; }
 .admin-share-section h4 {
     font-size: 14px;
     font-weight: 700;
-    color: var(--gray-800);
+    color: var(--text-primary);
     margin-bottom: 12px;
 }
 
@@ -5754,15 +5774,17 @@ body.modal-open .hamburger-btn { display: none; }
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: #f3f0ff;
-    border: 1.5px dashed #a78bfa;
+    gap: 10px;
+    background: rgba(124,58,237,0.10);
+    border: 1.5px dashed rgba(139,92,246,0.6);
     border-radius: 12px;
     padding: 10px 14px;
     margin-bottom: 16px;
     font-size: 14px;
     font-weight: 600;
-    color: #6d28d9;
+    color: #8b5cf6;
 }
+.admin-test-strip button { flex-shrink: 0; }
 
 .btn-sm {
     padding: 6px 14px;
