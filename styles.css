@@ -323,6 +323,8 @@ body {
     border: 2px solid var(--gray-200);
     border-radius: 12px;
     transition: all 0.2s;
+    background: var(--bg-input);
+    color: var(--text-primary);
 }
 
 .form-group input:focus {
@@ -1082,7 +1084,7 @@ body {
 }
 
 .wds-chip-add {
-    border: 1.5px dashed var(--border);
+    border: 1.5px dashed var(--border-color);
     background: transparent;
     color: var(--text-secondary);
     font-size: 13px;
@@ -1101,12 +1103,12 @@ body {
 }
 
 .wds-add-type-field {
-    border: 1.5px solid var(--border);
+    border: 1.5px solid var(--border-color);
     border-radius: 20px;
     padding: 6px 14px;
     font-size: 13px;
     font-family: inherit;
-    background: var(--surface, white);
+    background: var(--bg-card);
     color: var(--text-primary);
     outline: none;
     width: 130px;
@@ -1128,7 +1130,7 @@ body {
 
 .wds-chip-cancel {
     background: transparent;
-    border: 1.5px solid var(--border);
+    border: 1.5px solid var(--border-color);
     color: var(--text-secondary);
     font-size: 15px;
     padding: 6px 11px;
@@ -3186,6 +3188,10 @@ body.modal-open .hamburger-btn { display: none; }
     border-radius: 12px;
     margin-bottom: 12px;
 }
+[data-theme="dark"] .goal-reminder-content { background: rgba(0,0,0,0.3); }
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .goal-reminder-content { background: rgba(0,0,0,0.3); }
+}
 
 .goal-reminder-label {
     font-size: 12px;
@@ -3983,8 +3989,8 @@ body.modal-open .hamburger-btn { display: none; }
     display: flex;
     align-items: center;
     gap: 12px;
-    background: var(--surface, white);
-    border: 1px solid var(--border);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
     border-radius: 14px;
     padding: 14px 16px;
     margin-bottom: 10px;
@@ -4055,8 +4061,8 @@ body.modal-open .hamburger-btn { display: none; }
     align-items: center;
     justify-content: space-between;
     width: 100%;
-    background: var(--surface, white);
-    border: 1.5px solid var(--border);
+    background: var(--bg-card);
+    border: 1.5px solid var(--border-color);
     border-radius: 10px;
     padding: 10px 14px;
     font-size: 15px;
@@ -4083,7 +4089,7 @@ body.modal-open .hamburger-btn { display: none; }
 }
 .tps-content {
     position: relative;
-    background: var(--surface, white);
+    background: var(--bg-card);
     border-radius: 20px 20px 0 0;
     width: 100%;
     max-width: 480px;
@@ -4098,7 +4104,7 @@ body.modal-open .hamburger-btn { display: none; }
     display: flex;
     align-items: center;
     padding: 14px 16px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-color);
     gap: 4px;
 }
 .tps-header h3 {
@@ -4134,7 +4140,7 @@ body.modal-open .hamburger-btn { display: none; }
 .tps-team-card {
     display: flex;
     align-items: center;
-    border: 1.5px solid var(--border);
+    border: 1.5px solid var(--border-color);
     border-radius: 14px;
     padding: 14px 16px;
     margin-bottom: 10px;
@@ -4168,11 +4174,11 @@ body.modal-open .hamburger-btn { display: none; }
     padding: 3px 8px;
 }
 .tps-chevron { font-size: 20px; color: var(--text-secondary); line-height: 1; }
-.tps-divider { height: 1px; background: var(--border); margin: 16px 0; }
+.tps-divider { height: 1px; background: var(--border-color); margin: 16px 0; }
 .tps-create-btn {
     width: 100%;
     background: none;
-    border: 1.5px dashed var(--border);
+    border: 1.5px dashed var(--border-color);
     border-radius: 14px;
     padding: 14px;
     font-size: 15px;
@@ -4195,14 +4201,14 @@ body.modal-open .hamburger-btn { display: none; }
     cursor: pointer;
     margin-top: 4px;
 }
-.tps-leave-btn-full { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 20px; }
+.tps-leave-btn-full { margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px; }
 .tps-member-list { margin-bottom: 8px; }
 .tps-member-row {
     display: flex;
     align-items: center;
     gap: 12px;
     padding: 12px 0;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-color);
 }
 .tps-member-row:last-child { border-bottom: none; }
 .tps-member-me { background: var(--bg-subtle); border-radius: 12px; padding: 10px 12px; }
@@ -4245,12 +4251,12 @@ body.modal-open .hamburger-btn { display: none; }
     line-height: 1.5;
 }
 .tps-new-team-input {
-    border: 1.5px solid var(--border);
+    border: 1.5px solid var(--border-color);
     border-radius: 12px;
     padding: 14px 16px;
     font-size: 16px;
     font-family: inherit;
-    background: var(--surface, white);
+    background: var(--bg-card);
     color: var(--text-primary);
     outline: none;
     width: 100%;
@@ -4264,7 +4270,7 @@ body.modal-open .hamburger-btn { display: none; }
     align-items: center;
     gap: 16px;
     padding: 12px 0 20px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-color);
     margin-bottom: 4px;
 }
 .settings-avatar {
@@ -4282,7 +4288,7 @@ body.modal-open .hamburger-btn { display: none; }
     justify-content: center;
     cursor: pointer;
     flex-shrink: 0;
-    border: 3px solid var(--border);
+    border: 3px solid var(--border-color);
 }
 .settings-photo-info { flex: 1; }
 .settings-photo-label { font-size: 13px; color: var(--text-secondary); margin: 0 0 6px; }
@@ -6139,7 +6145,7 @@ body.modal-open {
     padding: 11px 14px;
     border: 1.5px dashed var(--primary-light);
     border-radius: 10px;
-    background: #eef2ff;
+    background: var(--bg-subtle);
     color: var(--primary);
     font-size: 14px;
     font-weight: 600;
@@ -6384,11 +6390,6 @@ body.modal-open {
 /* ============================================
    DASHBOARD USER AVATAR IN GREETING
    ============================================ */
-.greeting {
-    display: flex;
-    align-items: center;
-    gap: 0;
-}
 .dash-user-avatar {
     width: 46px;
     height: 46px;

@@ -553,6 +553,7 @@ async function supabaseRegister(userData) {
         timezone: userData.timezone || 'Asia/Kolkata',
         join_date: getTodayString(),
         password_hash: userData.passwordHash || null,
+        season_setup: { s7: true },
     }, { onConflict: 'phone', ignoreDuplicates: false });
     if (error) return { success: false, error: error.message };
     return { success: true };
@@ -1982,8 +1983,8 @@ function updateDashboard() {
     const remainEl = $('days-remaining');
     if (remainEl) remainEl.textContent = daysLeft;
 
-    // Calculate rank with tied rank support (using totalWorkouts)
-    const sorted = getSortedParticipants('all');
+    // Calculate rank with tied rank support (S7 participants only)
+    const sorted = getSortedParticipants('all').filter(p => p.seasonSetup?.s7);
     const userIndex = sorted.findIndex(p => isCurrentUser(p));
 
     // Find the rank by counting DISTINCT scores higher than user's score (dense ranking)
@@ -3117,7 +3118,7 @@ function renderMiniLeaderboard() {
     const list = $('mini-leaderboard');
     if (!list) return;
 
-    const sorted = getSortedParticipants('all').slice(0, 3);
+    const sorted = getSortedParticipants('all').filter(p => p.seasonSetup?.s7).slice(0, 3);
     const medals = ['🥇', '🥈', '🥉'];
 
     let html = '';
@@ -3256,6 +3257,10 @@ function renderParticipantsList(participants) {
 }
 
 function filterParticipants() {
+    // Only search on S7 tab; S6 tab has its own data
+    const activeTab = document.querySelector('.participants-tab.active')?.id;
+    if (activeTab === 'tab-s6') return;
+
     const searchInput = $('participants-search-input');
     const query = (searchInput?.value || '').toLowerCase().trim();
     const all = window.allParticipantsData || [];
