@@ -225,6 +225,9 @@
             <!-- Last Season Recap (hidden until S6 data loaded) -->
             <div id="last-season-card" class="last-season-card" style="display:none;"></div>
 
+            <!-- Team Dashboard Card (shown when user has a team) -->
+            <div id="team-dashboard-card" class="team-dashboard-card" style="display:none;"></div>
+
             <!-- Today's Check-in -->
             <div class="checkin-section" id="checkin-section">
                 <h3>Did you workout today?</h3>
@@ -258,8 +261,11 @@
 
                 <!-- No-team nudge -->
                 <div id="no-team-nudge" class="no-team-nudge" style="display:none;">
-                    <span>👥 Join a team to compete together!</span>
-                    <button onclick="showTeamPicker()">Join Team →</button>
+                    <div>
+                        <div class="ntn-title">👥 Join a team</div>
+                        <div class="ntn-sub">Compete together, stay accountable</div>
+                    </div>
+                    <button onclick="showTeamPicker()">Join →</button>
                 </div>
             </div>
 

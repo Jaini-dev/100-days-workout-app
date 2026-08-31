@@ -2058,6 +2058,7 @@ function updateDashboard() {
 
     // Last season recap card
     renderLastSeasonCard(user);
+    renderTeamDashboardCard();
 
     saveData();
 }
@@ -2702,7 +2703,7 @@ function renderLeaderboard(category = 'thisWeek') {
         const categoryTitle = $('category-title');
         const categoryDesc = $('category-desc');
         if (categoryTitle) categoryTitle.textContent = '👥 Team Battle';
-        if (categoryDesc) categoryDesc.textContent = 'Set your team in Settings to join the group board';
+        if (categoryDesc) categoryDesc.textContent = 'Click any team to see members and today\'s activity';
         renderTeamsLeaderboard();
         return;
     }
@@ -2899,25 +2900,48 @@ function showTeamList() {
 function showTeamDetail(teamName) {
     _tpsViewingTeam = teamName;
     _tpsSetHeader(true, teamName);
-    const enriched = getSortedParticipants('all');
+
+    const todayDate = getTodayString();
+    const enriched = getSortedParticipants('all').filter(p => p.seasonSetup?.s7);
     const members = enriched.filter(p => (p.teamName || '').trim().toLowerCase() === teamName.toLowerCase());
     const myKey = (appState.currentUser?.teamName || '').trim().toLowerCase();
     const isMyTeam = myKey === teamName.toLowerCase();
 
-    const body = $('tps-body');
-    if (!body) return;
-    let html = `<div class="tps-member-list">`;
-    members.sort((a, b) => b.totalWorkouts - a.totalWorkouts).forEach(m => {
-        const isMe = isCurrentUser(m);
-        html += `
-            <div class="tps-member-row${isMe ? ' tps-member-me' : ''}">
-                <div class="tps-member-avatar" style="${m.profilePhotoUrl ? `background-image:url('${m.profilePhotoUrl}');` : ''}">${m.profilePhotoUrl ? '' : _htmlEsc((m.name || '?').charAt(0).toUpperCase())}</div>
-                <div class="tps-member-name">${_htmlEsc(m.name)}${isMe ? ' <span class="tps-you-tag">(You)</span>' : ''}</div>
-                <div class="tps-member-stat">${m.totalWorkouts} days</div>
-            </div>`;
-    });
-    html += `</div>`;
+    // Team stats
+    const totalWorkouts = members.reduce((sum, m) => sum + (m.totalWorkouts || 0), 0);
+    const loggedToday = members.filter(m => {
+        const s = m.checkins ? m.checkins[todayDate] : m.todayStatus;
+        return s === 'Y' || s === 'R';
+    }).length;
+    const allTeams = Object.values(_getTeamsMap()).sort((a, b) => b.total - a.total);
+    const rankIdx = allTeams.findIndex(t => t.name.toLowerCase() === teamName.toLowerCase());
+    const rank = rankIdx >= 0 ? rankIdx + 1 : null;
 
+    const body = $('tps-body');
+    let html = `
+        <div class="tps-team-stats-row">
+            <div class="tps-team-stat-box"><span class="tps-tsb-val">${rank ? '#' + rank : '-'}</span><span class="tps-tsb-lbl">Team Rank</span></div>
+            <div class="tps-team-stat-box"><span class="tps-tsb-val">${totalWorkouts}</span><span class="tps-tsb-lbl">Total Days</span></div>
+            <div class="tps-team-stat-box"><span class="tps-tsb-val">${loggedToday}/${members.length}</span><span class="tps-tsb-lbl">Today</span></div>
+        </div>
+        <div class="tps-section-label" style="margin-top:16px;">Members</div>
+        <div class="tps-member-list">`;
+
+    members.forEach(m => {
+        const isMe = isCurrentUser(m);
+        const avatarStyle = m.profilePhotoUrl ? `background-image:url('${m.profilePhotoUrl}');background-size:cover;background-position:center;` : '';
+        const initial = m.profilePhotoUrl ? '' : (m.name || '?').charAt(0).toUpperCase();
+        const status = m.checkins ? m.checkins[todayDate] : m.todayStatus;
+        const statusIcon = status === 'Y' ? '✅' : status === 'R' ? '🧘' : status === 'N' ? '❌' : '⏳';
+        html += `<div class="tps-member-row${isMe ? ' tps-member-me' : ''}">
+            <div class="tps-member-avatar" style="${avatarStyle}">${initial}</div>
+            <div class="tps-member-name">${_htmlEsc(m.name)}${isMe ? ' <span class="tps-you-tag">(You)</span>' : ''}</div>
+            <div class="tps-member-today">${statusIcon}</div>
+            <div class="tps-member-stat">${m.totalWorkouts} days</div>
+        </div>`;
+    });
+
+    html += `</div>`;
     if (isMyTeam) {
         html += `<button class="tps-leave-btn tps-leave-btn-full" onclick="leaveTeam()">Leave this team</button>`;
     } else {
@@ -2981,6 +3005,74 @@ function _updateTeamDisplay() {
     if (el) el.textContent = appState.currentUser?.teamName || 'No team';
 }
 
+function _getTeamsMap() {
+    const enriched = getSortedParticipants('all').filter(p => p.seasonSetup?.s7);
+    const teamsMap = {};
+    enriched.forEach(p => {
+        const name = (p.teamName || '').trim();
+        if (!name) return;
+        const key = name.toLowerCase();
+        if (!teamsMap[key]) teamsMap[key] = { name, members: [], total: 0, thisWeek: 0 };
+        teamsMap[key].members.push(p);
+        teamsMap[key].total += p.totalWorkouts || 0;
+        teamsMap[key].thisWeek += p.weeklyWorkouts || 0;
+    });
+    return teamsMap;
+}
+
+function renderTeamDashboardCard() {
+    const card = $('team-dashboard-card');
+    if (!card) return;
+    const user = appState.currentUser;
+    if (!user?.teamName) { card.style.display = 'none'; return; }
+
+    const myTeamKey = user.teamName.trim().toLowerCase();
+    const todayDate = getTodayString();
+    const teamMembers = appState.participants.filter(p =>
+        p.seasonSetup?.s7 && (p.teamName || '').trim().toLowerCase() === myTeamKey
+    );
+    if (teamMembers.length === 0) { card.style.display = 'none'; return; }
+
+    const totalWorkouts = teamMembers.reduce((sum, m) => sum + (m.totalWorkouts || 0), 0);
+    const loggedToday = teamMembers.filter(p => {
+        const s = p.checkins ? p.checkins[todayDate] : p.todayStatus;
+        return s === 'Y' || s === 'R';
+    }).length;
+    const allLoggedToday = loggedToday === teamMembers.length;
+
+    const allTeams = Object.values(_getTeamsMap()).sort((a, b) => b.total - a.total);
+    const teamRankIdx = allTeams.findIndex(t => t.name.toLowerCase() === myTeamKey);
+    const teamRank = teamRankIdx >= 0 ? teamRankIdx + 1 : null;
+
+    const membersHtml = teamMembers.map(m => {
+        const isMe = isCurrentUser(m);
+        const status = m.checkins ? m.checkins[todayDate] : m.todayStatus;
+        const statusIcon = status === 'Y' ? '✅' : status === 'R' ? '🧘' : status === 'N' ? '❌' : '⏳';
+        const avatarStyle = m.profilePhotoUrl ? `background-image:url('${m.profilePhotoUrl}');background-size:cover;background-position:center;` : '';
+        const initial = m.profilePhotoUrl ? '' : (m.name || '?').charAt(0).toUpperCase();
+        return `<div class="tdc-member${isMe ? ' tdc-member-me' : ''}">
+            <div class="tdc-avatar" style="${avatarStyle}">${initial}</div>
+            <div class="tdc-name">${m.name.split(' ')[0]}</div>
+            <div class="tdc-status">${statusIcon}</div>
+        </div>`;
+    }).join('');
+
+    card.innerHTML = `
+        <div class="tdc-header">
+            <div class="tdc-team-info">
+                <div class="tdc-team-name">👥 ${_htmlEsc(user.teamName)}</div>
+                <div class="tdc-team-sub">${teamRank ? `#${teamRank} team · ` : ''}${totalWorkouts} total days · ${teamMembers.length} members</div>
+            </div>
+            <button class="tdc-view-btn" onclick="showTab('leaderboard');setTimeout(()=>renderLeaderboard('teams'),150);">Leaderboard →</button>
+        </div>
+        <div class="tdc-members">${membersHtml}</div>
+        <div class="tdc-today">
+            <span class="tdc-today-pill ${allLoggedToday ? 'tdc-all-logged' : ''}">${loggedToday}/${teamMembers.length} logged today${allLoggedToday ? ' 🔥' : ''}</span>
+        </div>
+    `;
+    card.style.display = 'block';
+}
+
 function renderTeamsLeaderboard() {
     const podium = $('podium');
     if (podium) podium.innerHTML = '';
@@ -3019,7 +3111,7 @@ function renderTeamsLeaderboard() {
         const rankDisplay = i < 3 ? medals[i] : `#${i + 1}`;
         const firstNames = team.members.map(m => m.name.split(' ')[0]).join(', ');
         html += `
-            <div class="lb-team-card${isMyTeam ? ' lb-team-card-me' : ''}">
+            <div class="lb-team-card${isMyTeam ? ' lb-team-card-me' : ''}" onclick="showTeamPicker();setTimeout(()=>showTeamDetail('${team.name.replace(/'/g,"\\'")}'),200);" style="cursor:pointer;">
                 <div class="lb-team-rank">${rankDisplay}</div>
                 <div class="lb-team-info">
                     <div class="lb-team-name">${team.name}${isMyTeam ? ' 👈' : ''}</div>
@@ -4952,6 +5044,7 @@ window.showTeamPicker = showTeamPicker;
 window.hideTeamPicker = hideTeamPicker;
 window.showTeamList = showTeamList;
 window.showTeamDetail = showTeamDetail;
+window.renderTeamDashboardCard = renderTeamDashboardCard;
 window.showCreateTeam = showCreateTeam;
 window.confirmCreateTeam = confirmCreateTeam;
 window.joinTeam = joinTeam;
