@@ -1879,24 +1879,23 @@ function updateDashboard() {
     // Calculate total workouts early (needed for badge and stats) - season-filtered
     const totalWorkouts = calculateTotalWorkouts(user);
 
-    // User name with admin badge
-    const nameEl = $('user-name');
-    if (nameEl) {
-        let nameHtml = user.name.split(' ')[0];
-        if (appState.isSuperAdmin) {
-            nameHtml += ' <span class="super-admin-badge">👑 SUPER ADMIN</span>';
-        } else if (appState.isAdmin) {
-            nameHtml += ' <span class="admin-badge">ADMIN</span>';
-        }
-        nameEl.innerHTML = nameHtml;
-    }
-
-    // Time-of-day greeting
+    // Time-of-day greeting sub + name with wave emoji
     const greetSubEl = $('greeting-sub');
+    const nameEl = $('user-name');
     if (greetSubEl) {
         const h = new Date().getHours();
         const tod = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-        greetSubEl.textContent = tod + ' 👋';
+        greetSubEl.textContent = tod;
+    }
+    if (nameEl) {
+        const firstName = user.name.split(' ')[0];
+        let nameHtml = firstName + ' 👋';
+        if (appState.isSuperAdmin) {
+            nameHtml = firstName + ' <span class="super-admin-badge">👑 SUPER ADMIN</span>';
+        } else if (appState.isAdmin) {
+            nameHtml = firstName + ' <span class="admin-badge">ADMIN</span>';
+        }
+        nameEl.innerHTML = nameHtml;
     }
 
     // Current workouts count (top right badge)
