@@ -103,6 +103,16 @@ body {
     min-height: 100vh;
     overflow-x: hidden;
 }
+[data-theme="dark"] body {
+    background: linear-gradient(180deg, #071a0f 0%, #0f172a 40%, #050d1a 100%);
+    background-attachment: fixed;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) body {
+        background: linear-gradient(180deg, #071a0f 0%, #0f172a 40%, #050d1a 100%);
+        background-attachment: fixed;
+    }
+}
 
 /* ============================================
    SCREENS
@@ -485,25 +495,28 @@ body {
 .greeting {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
 }
 
-.wave {
-    font-size: 28px;
-    animation: wave 1.5s infinite;
-    transform-origin: 70% 70%;
+.greeting-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
 }
 
-@keyframes wave {
-    0%, 100% { transform: rotate(0deg); }
-    25% { transform: rotate(20deg); }
-    75% { transform: rotate(-10deg); }
+.greeting-sub {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    letter-spacing: 0.2px;
 }
 
-.greeting h2 {
-    font-size: 22px;
-    font-weight: 700;
-    color: var(--gray-800);
+.greeting-name {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1.1;
+    letter-spacing: -0.5px;
 }
 
 .header-right {
@@ -526,13 +539,26 @@ body {
    ============================================ */
 .daily-motivation {
     background: var(--bg-card);
-    border-radius: 16px;
-    padding: 16px;
+    border-radius: 18px;
+    padding: 16px 18px;
     margin-bottom: 20px;
     display: flex;
     align-items: flex-start;
     gap: 12px;
     box-shadow: var(--shadow-sm);
+    border-left: 3px solid var(--primary);
+}
+[data-theme="dark"] .daily-motivation {
+    background: linear-gradient(135deg, rgba(6,78,59,0.25) 0%, rgba(30,41,59,0.8) 100%);
+    border-left-color: #34d399;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2), 0 0 0 1px rgba(52,211,153,0.1);
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .daily-motivation {
+        background: linear-gradient(135deg, rgba(6,78,59,0.25) 0%, rgba(30,41,59,0.8) 100%);
+        border-left-color: #34d399;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.2), 0 0 0 1px rgba(52,211,153,0.1);
+    }
 }
 
 .motivation-icon {
@@ -551,15 +577,36 @@ body {
    STREAK CARD
    ============================================ */
 .streak-card {
-    background: var(--gradient-2);
-    border-radius: 24px;
-    padding: 32px;
+    background: linear-gradient(145deg, #064e3b 0%, #059669 35%, #047857 65%, #065f46 100%);
+    border-radius: 28px;
+    padding: 36px 32px 32px;
     text-align: center;
     color: white;
     margin-bottom: 20px;
     position: relative;
     overflow: hidden;
     transition: all 0.3s;
+    box-shadow:
+        0 20px 60px rgba(5,150,105,0.4),
+        0 8px 24px rgba(0,0,0,0.25),
+        inset 0 1px 0 rgba(255,255,255,0.18),
+        inset 0 -1px 0 rgba(0,0,0,0.15);
+}
+/* Large decorative circle — top right */
+.streak-card::before {
+    content: '';
+    position: absolute;
+    top: -60px;
+    right: -60px;
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%);
+    pointer-events: none;
+}
+/* Small decorative circle — bottom left */
+.streak-card > .streak-card-ring {
+    display: none;
 }
 
 .streak-card.hot {
@@ -590,30 +637,40 @@ body {
 }
 
 .streak-number {
-    font-size: 72px;
-    font-weight: 800;
+    font-size: 88px;
+    font-weight: 900;
     line-height: 1;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
+    letter-spacing: -4px;
+    text-shadow: 0 4px 24px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.2);
 }
 
 .streak-label {
-    font-size: 18px;
-    font-weight: 600;
-    opacity: 0.9;
-    margin-bottom: 8px;
+    font-size: 16px;
+    font-weight: 700;
+    opacity: 0.92;
+    margin-bottom: 10px;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    font-size: 13px;
 }
 
 .streak-message {
     font-size: 14px;
-    opacity: 0.8;
+    opacity: 0.78;
+    font-style: italic;
 }
 
 .streak-secondary {
     font-size: 15px;
-    font-weight: 600;
-    opacity: 0.88;
-    margin: 6px 0 4px;
-    letter-spacing: 0.3px;
+    font-weight: 700;
+    opacity: 0.92;
+    margin: 8px 0 6px;
+    letter-spacing: 0.2px;
+    background: rgba(255,255,255,0.15);
+    display: inline-block;
+    padding: 4px 14px;
+    border-radius: 20px;
 }
 
 /* ============================================
@@ -626,6 +683,10 @@ body {
     text-align: center;
     margin-bottom: 20px;
     box-shadow: var(--shadow);
+}
+[data-theme="dark"] .checkin-section { box-shadow: 0 8px 30px rgba(0,0,0,0.3), 0 0 0 1px rgba(52,211,153,0.08); }
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .checkin-section { box-shadow: 0 8px 30px rgba(0,0,0,0.3), 0 0 0 1px rgba(52,211,153,0.08); }
 }
 
 .checkin-section h3 {
@@ -806,17 +867,32 @@ body {
 
 .stat-card {
     background: var(--bg-card);
-    border-radius: 16px;
+    border-radius: 20px;
     padding: 20px;
     text-align: center;
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow);
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.25s;
+    position: relative;
+    overflow: hidden;
+}
+.stat-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 20%; right: 20%;
+    height: 2px;
+    background: var(--gradient-1);
+    border-radius: 0 0 4px 4px;
+    opacity: 0.7;
+}
+[data-theme="dark"] .stat-card { box-shadow: 0 4px 20px rgba(0,0,0,0.3), 0 0 0 1px rgba(52,211,153,0.08); }
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .stat-card { box-shadow: 0 4px 20px rgba(0,0,0,0.3), 0 0 0 1px rgba(52,211,153,0.08); }
 }
 
 .stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow);
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
 }
 
 .clickable-card {
@@ -6590,4 +6666,96 @@ body.modal-open {
         color: var(--text-primary);
         border-color: var(--border-color);
     }
+}
+
+/* ============================================
+   LUXURY GLOBAL CARD POLISH (dark mode glass)
+   ============================================ */
+[data-theme="dark"] .participant-row,
+[data-theme="dark"] .login-form,
+[data-theme="dark"] .weekly-goal-strip,
+[data-theme="dark"] .summary-card {
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3), 0 0 0 1px rgba(52,211,153,0.07);
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .participant-row,
+    :root:not([data-theme="light"]) .login-form,
+    :root:not([data-theme="light"]) .summary-card {
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3), 0 0 0 1px rgba(52,211,153,0.07);
+    }
+}
+
+/* ============================================
+   LUXURY CHECKIN BUTTONS — selected state
+   ============================================ */
+.checkin-btn-v2.selected-yes {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    border-color: transparent;
+    color: white;
+    box-shadow: 0 6px 20px rgba(5,150,105,0.4);
+    transform: scale(1.04);
+}
+.checkin-btn-v2.selected-yes .btn-text { color: white; }
+.checkin-btn-v2.selected-rest {
+    background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+    border-color: transparent;
+    color: white;
+    box-shadow: 0 6px 20px rgba(14,165,233,0.4);
+    transform: scale(1.04);
+}
+.checkin-btn-v2.selected-rest .btn-text { color: white; }
+.checkin-btn-v2.selected-no {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    border-color: transparent;
+    color: white;
+    box-shadow: 0 6px 20px rgba(239,68,68,0.4);
+    transform: scale(1.04);
+}
+.checkin-btn-v2.selected-no .btn-text { color: white; }
+
+/* ============================================
+   LUXURY HEADER AREA
+   ============================================ */
+.header {
+    padding-bottom: 8px;
+}
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.day-badge {
+    background: linear-gradient(135deg, #059669, #047857);
+    color: white;
+    font-size: 13px;
+    font-weight: 800;
+    padding: 6px 12px;
+    border-radius: 20px;
+    box-shadow: 0 3px 10px rgba(5,150,105,0.4);
+    letter-spacing: 0.3px;
+}
+
+/* ============================================
+   LUXURY DASH AVATAR UPGRADE
+   ============================================ */
+.dash-user-avatar {
+    box-shadow: 0 3px 12px rgba(5,150,105,0.4), 0 0 0 3px rgba(52,211,153,0.2);
+    border: 2px solid rgba(52,211,153,0.5);
+}
+
+/* ============================================
+   LUXURY STAT VALUE COLOR
+   ============================================ */
+.stat-value {
+    background: var(--gradient-1);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* ============================================
+   CONTAINER BREATHING ROOM
+   ============================================ */
+#dashboard-screen .container {
+    padding-top: 28px;
 }

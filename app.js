@@ -1891,6 +1891,14 @@ function updateDashboard() {
         nameEl.innerHTML = nameHtml;
     }
 
+    // Time-of-day greeting
+    const greetSubEl = $('greeting-sub');
+    if (greetSubEl) {
+        const h = new Date().getHours();
+        const tod = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+        greetSubEl.textContent = tod + ' 👋';
+    }
+
     // Current workouts count (top right badge)
     const dayEl = $('current-day');
     if (dayEl) dayEl.textContent = totalWorkouts;
