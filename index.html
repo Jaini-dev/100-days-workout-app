@@ -707,6 +707,14 @@
             </div>
             <div class="modal-body centered">
                 <p>Did you workout on <strong id="quick-log-date" data-date="" data-status=""></strong>?</p>
+                <!-- Existing workout details for Y days -->
+                <div id="quick-log-details" style="display:none;" class="ql-details">
+                    <div id="ql-photo-wrap" style="display:none;" class="ql-photo-wrap">
+                        <div id="ql-photo" class="ql-photo"></div>
+                    </div>
+                    <div id="ql-meta" class="ql-meta"></div>
+                    <button class="ql-edit-btn" onclick="openWorkoutDetailsFromModal()">✏️ Edit Details</button>
+                </div>
                 <div class="quick-log-buttons">
                     <button class="quick-log-btn checkin-btn yes" data-status="Y" onclick="quickLogSubmit('Y')">
                         <span class="btn-icon">💪</span>

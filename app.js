@@ -2070,11 +2070,33 @@ function confirmAddWorkoutType() {
 }
 
 function dismissWorkoutDetails() {
+    // Auto-save whatever is selected before closing
+    _saveWorkoutDetailsQuiet();
     const sheet = $('workout-details-sheet');
     if (!sheet) return;
     sheet.classList.remove('wds-visible');
     setTimeout(() => { if (!sheet.classList.contains('wds-visible')) sheet.style.display = 'none'; }, 300);
     _wdsDate = null;
+}
+
+function _saveWorkoutDetailsQuiet() {
+    if (!_wdsDate || !appState.currentUser) return;
+    const typeEl = document.querySelector('#wds-type-chips .wds-chip.selected');
+    const moodEl = document.querySelector('#wds-mood-chips .wds-chip.selected');
+    const note = ($('wds-note')?.value || '').trim();
+    if (!typeEl && !moodEl && !note) return;
+    if (!appState.currentUser.checkinDetails) appState.currentUser.checkinDetails = {};
+    const existing = appState.currentUser.checkinDetails[_wdsDate] || {};
+    const updated = { ...existing, type: typeEl?.dataset.value || existing.type || null, mood: moodEl?.dataset.value || existing.mood || null, note: note || existing.note || null };
+    appState.currentUser.checkinDetails[_wdsDate] = updated;
+    const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
+    if (idx >= 0) {
+        if (!appState.participants[idx].checkinDetails) appState.participants[idx].checkinDetails = {};
+        appState.participants[idx].checkinDetails[_wdsDate] = updated;
+    }
+    supabaseSaveProfile(appState.currentUser).catch(() => {});
+    saveData();
+    if (appState.currentTab === 'calendar') renderCalendar();
 }
 
 function selectWdsChip(el) {
@@ -2091,18 +2113,19 @@ function saveWorkoutDetails() {
     if (!typeEl && !moodEl && !note) { dismissWorkoutDetails(); return; }
 
     if (!appState.currentUser.checkinDetails) appState.currentUser.checkinDetails = {};
-    appState.currentUser.checkinDetails[_wdsDate] = {
-        type: typeEl?.dataset.value || null,
-        mood: moodEl?.dataset.value || null,
-        note: note || null
-    };
+    const existing = appState.currentUser.checkinDetails[_wdsDate] || {};
+    const updated = { ...existing, type: typeEl?.dataset.value || existing.type || null, mood: moodEl?.dataset.value || existing.mood || null, note: note || existing.note || null };
+    appState.currentUser.checkinDetails[_wdsDate] = updated;
     const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
     if (idx >= 0) {
         if (!appState.participants[idx].checkinDetails) appState.participants[idx].checkinDetails = {};
-        appState.participants[idx].checkinDetails[_wdsDate] = appState.currentUser.checkinDetails[_wdsDate];
+        appState.participants[idx].checkinDetails[_wdsDate] = updated;
     }
+    supabaseSaveProfile(appState.currentUser).catch(() => {});
     saveData();
+    const dateWas = _wdsDate;
     dismissWorkoutDetails();
+    _wdsDate = null;
     showToast('Details saved! 📝', 'success');
     if (appState.currentTab === 'calendar') renderCalendar();
 }
@@ -3481,38 +3504,66 @@ function quickLogFromCalendar(dateStr) {
 }
 
 function openDayEditor(dateStr, currentStatus) {
-    // Show day editor modal
     const date = new Date(dateStr);
     const modal = $('quick-log-modal');
-    if (modal) {
-        $('quick-log-date').textContent = formatShortDate(date);
-        $('quick-log-date').dataset.date = dateStr;
-        $('quick-log-date').dataset.status = currentStatus;
+    if (!modal) return;
 
-        // Show/hide delete button based on whether there's a status
-        const deleteBtn = $('quick-log-delete');
-        if (deleteBtn) {
-            deleteBtn.style.display = currentStatus ? 'inline-block' : 'none';
-        }
+    $('quick-log-date').textContent = formatShortDate(date);
+    $('quick-log-date').dataset.date = dateStr;
+    $('quick-log-date').dataset.status = currentStatus;
 
-        // Update modal title
-        const modalTitle = modal.querySelector('.modal-title');
-        if (modalTitle) {
-            modalTitle.textContent = currentStatus ? 'Edit Entry' : 'Log Workout';
-        }
+    const deleteBtn = $('quick-log-delete');
+    if (deleteBtn) deleteBtn.style.display = currentStatus ? 'inline-block' : 'none';
 
-        // Highlight current status button if there is one
-        const buttons = modal.querySelectorAll('.quick-log-btn');
-        buttons.forEach(btn => {
-            btn.classList.remove('selected');
-            if (btn.dataset.status === currentStatus) {
-                btn.classList.add('selected');
+    const modalTitle = modal.querySelector('.modal-title');
+    if (modalTitle) modalTitle.textContent = currentStatus ? 'Edit Entry' : 'Log Workout';
+
+    modal.querySelectorAll('.quick-log-btn').forEach(btn => {
+        btn.classList.toggle('selected', btn.dataset.status === currentStatus);
+    });
+
+    // Show existing workout details for Y days
+    const detailsEl = $('quick-log-details');
+    if (detailsEl) {
+        const details = currentStatus === 'Y' ? ((appState.currentUser?.checkinDetails || {})[dateStr] || null) : null;
+        if (details && (details.type || details.mood || details.note || details.photo)) {
+            detailsEl.style.display = '';
+            const metaEl = $('ql-meta');
+            if (metaEl) {
+                const parts = [];
+                if (details.type) parts.push(`${getWorkoutTypeIcon(details.type)} ${details.type}`);
+                if (details.mood) parts.push(details.mood);
+                if (details.note) parts.push(`"${details.note}"`);
+                metaEl.innerHTML = parts.map(p => `<span class="ql-tag">${p}</span>`).join('');
             }
-        });
-
-        modal.classList.add('active');
+            const photoWrap = $('ql-photo-wrap');
+            const photoEl = $('ql-photo');
+            if (photoWrap && photoEl) {
+                if (details.photo) {
+                    photoWrap.style.display = '';
+                    photoEl.style.backgroundImage = '';
+                    getSB().storage.from(CONFIG.CHECKIN_PHOTO_BUCKET).createSignedUrl(details.photo, 7 * 24 * 3600)
+                        .then(({ data }) => {
+                            if (data?.signedUrl) photoEl.style.backgroundImage = `url('${data.signedUrl}')`;
+                        });
+                } else {
+                    photoWrap.style.display = 'none';
+                }
+            }
+        } else {
+            detailsEl.style.display = 'none';
+        }
     }
+
+    modal.classList.add('active');
 }
+
+window.openWorkoutDetailsFromModal = function() {
+    const dateStr = $('quick-log-date')?.dataset.date;
+    if (!dateStr) return;
+    closeModal('quick-log-modal');
+    setTimeout(() => showWorkoutDetailsSheet(dateStr), 200);
+};
 
 function quickLogSubmit(status) {
     const dateStr = $('quick-log-date').dataset.date;
