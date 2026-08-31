@@ -855,6 +855,15 @@ function showSettings() {
         if (weeklyGoalSelect) {
             weeklyGoalSelect.value = appState.currentUser.weeklyGoal || '';
         }
+        const teamInput = $('settings-team');
+        if (teamInput) teamInput.value = appState.currentUser.teamName || '';
+    }
+    // Populate known teams datalist
+    const datalist = $('known-teams-list');
+    if (datalist) {
+        const teams = new Set();
+        appState.participants.forEach(p => { if (p.teamName && p.teamName.trim()) teams.add(p.teamName.trim()); });
+        datalist.innerHTML = [...teams].map(t => `<option value="${t}">`).join('');
     }
     $('info-participants').textContent = appState.participants.length;
     const infoSeasonEl = $('info-season');
@@ -2211,6 +2220,15 @@ function renderLeaderboard(category = 'thisWeek') {
         btn.classList.toggle('active', btn.dataset.category === category);
     });
 
+    if (category === 'teams') {
+        const categoryTitle = $('category-title');
+        const categoryDesc = $('category-desc');
+        if (categoryTitle) categoryTitle.textContent = '👥 Team Battle';
+        if (categoryDesc) categoryDesc.textContent = 'Set your team in Settings to join the group board';
+        renderTeamsLeaderboard();
+        return;
+    }
+
     const sorted = getSortedParticipants(category);
     const currentDay = getCurrentDay();
 
@@ -2314,6 +2332,59 @@ function renderLeaderboard(category = 'thisWeek') {
 
         list.innerHTML = html || '<p class="empty-message">No participants yet</p>';
     }
+}
+
+function renderTeamsLeaderboard() {
+    const podium = $('podium');
+    if (podium) podium.innerHTML = '';
+    const list = $('leaderboard-list');
+    if (!list) return;
+
+    const enriched = getSortedParticipants('all');
+    const teamsMap = {};
+    enriched.forEach(p => {
+        const name = (p.teamName || '').trim();
+        if (!name) return;
+        const key = name.toLowerCase();
+        if (!teamsMap[key]) teamsMap[key] = { name, members: [], total: 0, thisWeek: 0 };
+        teamsMap[key].members.push(p);
+        teamsMap[key].total += p.totalWorkouts || 0;
+        teamsMap[key].thisWeek += p.weeklyWorkouts || 0;
+    });
+
+    const teams = Object.values(teamsMap).sort((a, b) => b.total - a.total || b.thisWeek - a.thisWeek);
+    const myKey = (appState.currentUser?.teamName || '').trim().toLowerCase();
+
+    if (teams.length === 0) {
+        list.innerHTML = `
+            <div class="lb-empty-state">
+                <span class="lb-empty-icon">👥</span>
+                <p>No teams yet!</p>
+                <p class="lb-empty-hint">Set a team name in Settings to form a team with others who share the same name.</p>
+            </div>`;
+        return;
+    }
+
+    const medals = ['🥇', '🥈', '🥉'];
+    let html = '';
+    teams.forEach((team, i) => {
+        const isMyTeam = myKey && team.name.toLowerCase() === myKey;
+        const rankDisplay = i < 3 ? medals[i] : `#${i + 1}`;
+        const firstNames = team.members.map(m => m.name.split(' ')[0]).join(', ');
+        html += `
+            <div class="lb-team-card${isMyTeam ? ' lb-team-card-me' : ''}">
+                <div class="lb-team-rank">${rankDisplay}</div>
+                <div class="lb-team-info">
+                    <div class="lb-team-name">${team.name}${isMyTeam ? ' 👈' : ''}</div>
+                    <div class="lb-team-members">${team.members.length} member${team.members.length > 1 ? 's' : ''} · ${firstNames}</div>
+                </div>
+                <div class="lb-team-stats">
+                    <div><span class="lb-team-stat-val">${team.total}</span> <span class="lb-team-stat-lbl">days</span></div>
+                    <div><span class="lb-team-stat-val lb-team-week">${team.thisWeek}</span> <span class="lb-team-stat-lbl">this wk</span></div>
+                </div>
+            </div>`;
+    });
+    list.innerHTML = html;
 }
 
 // Toggle leaderboard expand/collapse
@@ -3888,6 +3959,7 @@ function saveSettings() {
     const timezone = $('settings-timezone') ? $('settings-timezone').value : 'Asia/Kolkata';
     const weeklyGoalRaw = $('settings-weekly-goal') ? $('settings-weekly-goal').value : '';
     const weeklyGoal = weeklyGoalRaw ? parseInt(weeklyGoalRaw) : null;
+    const teamName = ($('settings-team')?.value || '').trim() || null;
 
     if (!name) {
         showToast('Name cannot be empty', 'error');
@@ -3899,6 +3971,7 @@ function saveSettings() {
     appState.currentUser.commitment = commitment;
     appState.currentUser.timezone = timezone;
     appState.currentUser.weeklyGoal = weeklyGoal;
+    appState.currentUser.teamName = teamName;
 
     const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
     if (idx >= 0) {
@@ -3907,6 +3980,7 @@ function saveSettings() {
         appState.participants[idx].commitment = commitment;
         appState.participants[idx].timezone = timezone;
         appState.participants[idx].weeklyGoal = weeklyGoal;
+        appState.participants[idx].teamName = teamName;
     }
 
     saveData();

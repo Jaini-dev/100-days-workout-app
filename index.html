@@ -315,6 +315,7 @@
                 <button class="lb-filter-btn active" data-category="thisWeek">This Week</button>
                 <button class="lb-filter-btn" data-category="comeback">Comeback</button>
                 <button class="lb-filter-btn" data-category="streaks">Streaks</button>
+                <button class="lb-filter-btn" data-category="teams">👥 Teams</button>
             </div>
 
             <!-- Category Description -->
@@ -565,6 +566,12 @@
                         <option value="6">6 days / week</option>
                         <option value="7">Every day</option>
                     </select>
+                </div>
+                <div class="settings-item">
+                    <label>Team Name</label>
+                    <input type="text" id="settings-team" class="settings-input" placeholder="e.g. Alpha Squad" list="known-teams-list" autocomplete="off" maxlength="30">
+                    <datalist id="known-teams-list"></datalist>
+                    <p class="settings-hint">Same name = same team. Leave blank to stay solo.</p>
                 </div>
                 <div class="settings-item settings-item-timezone">
                     <label>Your Timezone</label>
