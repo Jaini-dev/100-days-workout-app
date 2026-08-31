@@ -1251,9 +1251,10 @@ function showSettings() {
         if (timezoneSelect) {
             timezoneSelect.value = appState.currentUser.timezone || 'Asia/Kolkata';
         }
-        const weeklyGoalSelect = $('settings-weekly-goal');
-        if (weeklyGoalSelect) {
-            weeklyGoalSelect.value = appState.currentUser.weeklyGoal || '';
+        const weeklyGoalInput = $('settings-weekly-goal');
+        if (weeklyGoalInput) {
+            weeklyGoalInput.value = appState.currentUser.seasonSetup?.weeklyGoalText
+                || (appState.currentUser.weeklyGoal ? String(appState.currentUser.weeklyGoal) : '');
         }
     }
     _updateTeamDisplay();
@@ -1922,12 +1923,12 @@ function updateDashboard() {
     const noTeamNudge = $('no-team-nudge');
     if (noTeamNudge) noTeamNudge.style.display = appState.currentUser?.teamName ? 'none' : '';
 
-    // "Update past records" link - only show from Sep 2 onwards
+    // "Update past records" link - show from Sep 2 onwards (or always for admins)
     const pastLink = $('update-past-link');
     if (pastLink) {
         const today = new Date(); today.setHours(0,0,0,0);
         const showFrom = new Date('2026-09-02');
-        pastLink.style.display = today >= showFrom ? '' : 'none';
+        pastLink.style.display = (today >= showFrom || appState.isAdmin || appState.isSuperAdmin) ? '' : 'none';
     }
 
     // Daily motivation quote
@@ -2088,26 +2089,33 @@ function renderWeeklyGoal() {
     const container = $('weekly-goal-strip');
     if (!container) return;
     const user = appState.currentUser;
-    if (!user || !user.weeklyGoal) { container.style.display = 'none'; return; }
-
-    const goal = parseInt(user.weeklyGoal);
-    const thisWeek = calculateWeeklyImprovement(user).thisWeek;
-    const over = thisWeek >= goal;
-
-    const dots = Array.from({ length: goal }, (_, i) =>
-        `<span class="week-dot${i < thisWeek ? ' done' : ''}"></span>`
-    ).join('');
-
-    let msg;
-    if (thisWeek === 0) msg = `🎯 Goal: ${goal} workouts this week`;
-    else if (over) msg = `🔥 ${thisWeek}/${goal} - weekly goal crushed!`;
-    else msg = `💪 ${thisWeek} of ${goal} this week`;
+    const goalText = user?.seasonSetup?.weeklyGoalText;
+    const goalNum = user?.weeklyGoal ? parseInt(user.weeklyGoal) : null;
+    if (!user || (!goalText && !goalNum)) { container.style.display = 'none'; return; }
 
     container.style.display = 'block';
-    container.innerHTML = `<div class="weekly-goal-inner${over ? ' goal-done' : ''}">
-        <span class="weekly-goal-text">${msg}</span>
-        <div class="weekly-goal-dots">${dots}</div>
-    </div>`;
+
+    if (goalNum && goalNum > 0) {
+        // Numeric goal: show progress dots
+        const thisWeek = calculateWeeklyImprovement(user).thisWeek;
+        const over = thisWeek >= goalNum;
+        const dots = Array.from({ length: goalNum }, (_, i) =>
+            `<span class="week-dot${i < thisWeek ? ' done' : ''}"></span>`
+        ).join('');
+        let msg;
+        if (thisWeek === 0) msg = `🎯 Goal: ${goalNum} workouts this week`;
+        else if (over) msg = `🔥 ${thisWeek}/${goalNum} - weekly goal crushed!`;
+        else msg = `💪 ${thisWeek} of ${goalNum} this week`;
+        container.innerHTML = `<div class="weekly-goal-inner${over ? ' goal-done' : ''}">
+            <span class="weekly-goal-text">${msg}</span>
+            <div class="weekly-goal-dots">${dots}</div>
+        </div>`;
+    } else {
+        // Text goal: show as reminder
+        container.innerHTML = `<div class="weekly-goal-inner">
+            <span class="weekly-goal-text">🎯 Goal: ${_htmlEsc(goalText)}</span>
+        </div>`;
+    }
 }
 
 let _wdsDate = null;
@@ -2433,10 +2441,12 @@ async function submitCheckin(status, dateStr = null) {
 
     const targetDate = dateStr || getTodayString();
 
-    // Never allow checkins before season start
+    // Block checkins before season start (except for admins testing)
     const tDate = new Date(targetDate); tDate.setHours(0,0,0,0);
     const sStart = new Date(challengeSettings.startDate); sStart.setHours(0,0,0,0);
-    if (tDate < sStart) { showToast('Season 7 starts Sep 1 - no entries before that!', ''); return; }
+    if (tDate < sStart && !appState.isAdmin && !appState.isSuperAdmin) {
+        showToast('Season 7 starts Sep 1 - no entries before that!', ''); return;
+    }
 
     // Update local state first
     if (!appState.currentUser.checkins) {
@@ -2590,7 +2600,9 @@ function renderPastDaysSection() {
 function logPastDay(dateStr, status) {
     const d = new Date(dateStr); d.setHours(0,0,0,0);
     const seasonStart = new Date(challengeSettings.startDate); seasonStart.setHours(0,0,0,0);
-    if (d < seasonStart) { showToast('Season 7 starts Sep 1 - no entries before that!', ''); return; }
+    if (d < seasonStart && !appState.isAdmin && !appState.isSuperAdmin) {
+        showToast('Season 7 starts Sep 1 - no entries before that!', ''); return;
+    }
     submitCheckin(status, dateStr);
 }
 
@@ -2866,8 +2878,12 @@ function showTeamList() {
         if (!teamsMap[key]) teamsMap[key] = { name, members: [] };
         teamsMap[key].members.push(p);
     });
-    const teams = Object.values(teamsMap).sort((a, b) => b.members.length - a.members.length);
+    // Ensure current user's team always appears even if participants sync is stale
     const myKey = (appState.currentUser?.teamName || '').trim().toLowerCase();
+    if (myKey && !teamsMap[myKey]) {
+        teamsMap[myKey] = { name: appState.currentUser.teamName, members: [appState.currentUser] };
+    }
+    const teams = Object.values(teamsMap).sort((a, b) => b.members.length - a.members.length);
 
     const body = $('tps-body');
     if (!body) return;
@@ -3290,13 +3306,68 @@ window.switchParticipantsTab = function(tab, el) {
     }
 };
 
+function showS6HistoryModal() {
+    let overlay = $('s6-history-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 's6-history-overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:2000;background:var(--bg-page);overflow-y:auto;display:flex;flex-direction:column;';
+        overlay.innerHTML = `
+            <div style="display:flex;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border-color);gap:12px;position:sticky;top:0;background:var(--bg-page);z-index:1;">
+                <button onclick="document.getElementById('s6-history-overlay').remove();" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-primary);line-height:1;">←</button>
+                <h2 style="margin:0;font-size:18px;font-weight:800;color:var(--text-primary);">📜 Season 6 History</h2>
+            </div>
+            <div id="s6-modal-body" style="padding:16px 20px;flex:1;">
+                <p style="color:var(--text-secondary);text-align:center;">Loading…</p>
+            </div>`;
+        document.body.appendChild(overlay);
+    } else {
+        overlay.style.display = 'flex';
+    }
+    _loadS6HistoryInto($('s6-modal-body'));
+}
+
+async function _loadS6HistoryInto(container) {
+    if (!container) return;
+    container.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:40px 0;">Loading Season 6 data…</p>';
+    const sb = getSB();
+    const [{ data: s6Participants }, { data: s6Checkins }] = await Promise.all([
+        sb.from('participants').select('phone, name'),
+        sb.from('checkins').select('phone, status').lt('date', challengeSettings.startDate),
+    ]);
+    const countByPhone = {};
+    (s6Checkins || []).forEach(c => {
+        if (c.status === 'Y') countByPhone[c.phone] = (countByPhone[c.phone] || 0) + 1;
+    });
+    const list = (s6Participants || [])
+        .map(r => ({ name: r.name, phone: r.phone, total: countByPhone[r.phone] || 0 }))
+        .filter(p => p.total > 0)
+        .sort((a, b) => b.total - a.total);
+    if (!list.length) { container.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:40px 0;">No Season 6 data found</p>'; return; }
+    let html = '';
+    list.forEach((p, i) => {
+        const isMe = appState.currentUser?.phone === p.phone;
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `<span style="font-size:13px;color:var(--text-secondary);">${i + 1}</span>`;
+        html += `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border-color)${isMe ? ';background:rgba(5,150,105,0.06);border-radius:10px;padding-left:8px;' : ''}">
+            <div style="width:32px;text-align:center;font-size:18px;">${medal}</div>
+            <div style="width:38px;height:38px;border-radius:50%;background:var(--bg-subtle);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:var(--primary);">${(p.name||'?').charAt(0).toUpperCase()}</div>
+            <div style="flex:1;">
+                <div style="font-weight:700;color:var(--text-primary);font-size:15px;">${_htmlEsc(p.name)}${isMe ? ' <span style="font-size:11px;background:var(--primary);color:white;padding:1px 6px;border-radius:8px;">You</span>' : ''}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Season 6 workouts</div>
+            </div>
+            <div style="font-size:20px;font-weight:800;color:var(--primary);">${p.total}</div>
+        </div>`;
+    });
+    container.innerHTML = html;
+}
+
 async function loadS6History() {
     const container = $('participants-list-container');
     if (container) container.innerHTML = '<p class="empty-message">Loading Season 6 data...</p>';
     const sb = getSB();
     const [{ data: s6Rows }, { data: s6Checkins }] = await Promise.all([
         sb.from('participants').select('phone, name'),
-        sb.from('checkins').select('phone, status').gte('date', '2026-02-01').lte('date', '2026-07-31'),
+        sb.from('checkins').select('phone, status').lt('date', challengeSettings.startDate),
     ]);
     const countByPhone = {};
     (s6Checkins || []).forEach(c => {
@@ -4798,8 +4869,9 @@ function saveSettings() {
     const goal = $('settings-goal').value.trim();
     const commitment = $('settings-commitment').value.trim();
     const timezone = $('settings-timezone') ? $('settings-timezone').value : 'Asia/Kolkata';
-    const weeklyGoalRaw = $('settings-weekly-goal') ? $('settings-weekly-goal').value : '';
-    const weeklyGoal = weeklyGoalRaw ? parseInt(weeklyGoalRaw) : null;
+    const weeklyGoalRaw = ($('settings-weekly-goal') ? $('settings-weekly-goal').value : '').trim();
+    const weeklyGoalNum = weeklyGoalRaw ? parseInt(weeklyGoalRaw) : null;
+    const weeklyGoal = (!isNaN(weeklyGoalNum) && weeklyGoalNum > 0) ? weeklyGoalNum : null;
     if (!name) {
         showToast('Name cannot be empty', 'error');
         return;
@@ -4810,6 +4882,8 @@ function saveSettings() {
     appState.currentUser.commitment = commitment;
     appState.currentUser.timezone = timezone;
     appState.currentUser.weeklyGoal = weeklyGoal;
+    if (!appState.currentUser.seasonSetup) appState.currentUser.seasonSetup = {};
+    appState.currentUser.seasonSetup.weeklyGoalText = weeklyGoalRaw || null;
 
     const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
     if (idx >= 0) {
@@ -5065,6 +5139,7 @@ window.confirmCreateTeam = confirmCreateTeam;
 window.joinTeam = joinTeam;
 window.leaveTeam = leaveTeam;
 window.confirmLeaveTeam = confirmLeaveTeam;
+window.showS6HistoryModal = showS6HistoryModal;
 window.dismissWorkoutDetails = dismissWorkoutDetails;
 window.selectWdsChip = selectWdsChip;
 window.saveWorkoutDetails = saveWorkoutDetails;

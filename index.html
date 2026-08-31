@@ -393,11 +393,6 @@
                 <input type="text" id="participants-search-input" placeholder="Search by name..." oninput="filterParticipants()">
             </div>
 
-            <div class="participants-tabs">
-                <button class="participants-tab active" id="tab-s7" onclick="switchParticipantsTab('s7', this)">Season 7</button>
-                <button class="participants-tab" id="tab-s6" onclick="switchParticipantsTab('s6', this)">Season 6 History</button>
-            </div>
-
             <div id="participants-list-container">
                 <!-- Dynamically rendered -->
             </div>
@@ -590,16 +585,8 @@
                     <input type="text" id="settings-commitment" class="settings-input" placeholder="Your daily commitment">
                 </div>
                 <div class="settings-item">
-                    <label>Weekly Workout Goal</label>
-                    <select id="settings-weekly-goal" class="settings-input">
-                        <option value="">No goal set</option>
-                        <option value="2">2 days / week</option>
-                        <option value="3">3 days / week</option>
-                        <option value="4">4 days / week</option>
-                        <option value="5">5 days / week</option>
-                        <option value="6">6 days / week</option>
-                        <option value="7">Every day</option>
-                    </select>
+                    <label>Weekly Goal</label>
+                    <input type="text" id="settings-weekly-goal" class="settings-input" placeholder="e.g. 5 workouts, 20km, 3 runs">
                 </div>
                 <div class="settings-item settings-team-item">
                     <label>Team</label>
@@ -1034,6 +1021,10 @@
             <a href="#" class="sidebar-item" data-tab="halloffame" onclick="sidebarNav(event, 'halloffame')">
                 <span class="sidebar-icon">🏆</span>
                 <span class="sidebar-text">Hall of Fame</span>
+            </a>
+            <a href="#" class="sidebar-item" onclick="closeSidebar();showS6HistoryModal();">
+                <span class="sidebar-icon">📜</span>
+                <span class="sidebar-text">Season 6 History</span>
             </a>
             <a href="#" class="sidebar-item" data-tab="admin" id="sidebar-admin-item" style="display: none;" onclick="sidebarNav(event, 'admin')">
                 <span class="sidebar-icon">👑</span>
