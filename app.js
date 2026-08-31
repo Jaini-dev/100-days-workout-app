@@ -1656,25 +1656,80 @@ function renderWeeklyGoal() {
 
 let _wdsDate = null;
 
+function _renderCustomTypeChips(selectedType) {
+    const container = $('wds-type-chips');
+    if (!container) return;
+    container.querySelectorAll('.wds-chip-custom').forEach(c => c.remove());
+    container.querySelectorAll('.wds-chip').forEach(c => c.classList.remove('selected'));
+    const addBtn = $('wds-add-type-btn');
+    const customTypes = appState.currentUser?.customWorkoutTypes || [];
+    customTypes.forEach(type => {
+        const btn = document.createElement('button');
+        btn.className = 'wds-chip wds-chip-custom';
+        btn.dataset.value = type;
+        btn.onclick = function() { selectWdsChip(this); };
+        btn.textContent = '💪 ' + type;
+        container.insertBefore(btn, addBtn);
+    });
+    if (selectedType) {
+        const tc = container.querySelector(`[data-value="${selectedType}"]`);
+        if (tc) tc.classList.add('selected');
+    }
+}
+
 function showWorkoutDetailsSheet(dateStr) {
     _wdsDate = dateStr;
     const existing = (appState.currentUser?.checkinDetails || {})[dateStr] || {};
-    document.querySelectorAll('.wds-chip').forEach(c => c.classList.remove('selected'));
-    if (existing.type) {
-        const tc = document.querySelector(`#wds-type-chips [data-value="${existing.type}"]`);
-        if (tc) tc.classList.add('selected');
-    }
+    _renderCustomTypeChips(existing.type);
+    document.querySelectorAll('#wds-mood-chips .wds-chip').forEach(c => c.classList.remove('selected'));
     if (existing.mood) {
         const mc = document.querySelector(`#wds-mood-chips [data-value="${existing.mood}"]`);
         if (mc) mc.classList.add('selected');
     }
     const noteEl = $('wds-note');
     if (noteEl) noteEl.value = existing.note || '';
+    const addBtn = $('wds-add-type-btn');
+    if (addBtn) addBtn.style.display = '';
+    const addRow = $('wds-add-type-row');
+    if (addRow) addRow.style.display = 'none';
+    const addField = $('wds-add-type-field');
+    if (addField) addField.value = '';
     const sheet = $('workout-details-sheet');
     if (sheet) {
         sheet.style.display = 'flex';
         requestAnimationFrame(() => sheet.classList.add('wds-visible'));
     }
+}
+
+function startAddWorkoutType() {
+    const addBtn = $('wds-add-type-btn');
+    if (addBtn) addBtn.style.display = 'none';
+    const addRow = $('wds-add-type-row');
+    if (addRow) addRow.style.display = 'flex';
+    const addField = $('wds-add-type-field');
+    if (addField) { addField.value = ''; setTimeout(() => addField.focus(), 50); }
+}
+
+function cancelAddWorkoutType() {
+    const addBtn = $('wds-add-type-btn');
+    if (addBtn) addBtn.style.display = '';
+    const addRow = $('wds-add-type-row');
+    if (addRow) addRow.style.display = 'none';
+}
+
+function confirmAddWorkoutType() {
+    const addField = $('wds-add-type-field');
+    const name = (addField?.value || '').trim();
+    if (!name) { cancelAddWorkoutType(); return; }
+    if (!appState.currentUser.customWorkoutTypes) appState.currentUser.customWorkoutTypes = [];
+    if (!appState.currentUser.customWorkoutTypes.includes(name)) {
+        appState.currentUser.customWorkoutTypes.push(name);
+        const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
+        if (idx >= 0) appState.participants[idx].customWorkoutTypes = appState.currentUser.customWorkoutTypes;
+        saveData();
+    }
+    cancelAddWorkoutType();
+    _renderCustomTypeChips(name);
 }
 
 function dismissWorkoutDetails() {
@@ -4060,6 +4115,9 @@ window.quickLogSubmit = quickLogSubmit;
 window.quickLogDelete = quickLogDelete;
 window.openDayEditor = openDayEditor;
 window.showWorkoutDetailsSheet = showWorkoutDetailsSheet;
+window.startAddWorkoutType = startAddWorkoutType;
+window.cancelAddWorkoutType = cancelAddWorkoutType;
+window.confirmAddWorkoutType = confirmAddWorkoutType;
 window.dismissWorkoutDetails = dismissWorkoutDetails;
 window.selectWdsChip = selectWdsChip;
 window.saveWorkoutDetails = saveWorkoutDetails;

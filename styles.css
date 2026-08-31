@@ -1022,6 +1022,62 @@ body {
     margin-top: 4px;
 }
 
+.wds-chip-add {
+    border: 1.5px dashed var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.wds-chip-add:hover { background: var(--gray-100); }
+
+.wds-chip-custom { background: #f0f4ff; }
+
+.wds-add-type-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0 2px;
+    flex-wrap: nowrap;
+}
+
+.wds-add-type-field {
+    border: 1.5px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--surface, white);
+    color: var(--text-primary);
+    outline: none;
+    width: 130px;
+    min-width: 0;
+}
+
+.wds-add-type-field:focus { border-color: var(--primary); }
+
+.wds-chip-confirm {
+    background: var(--primary, #6c63ff);
+    color: white;
+    border: none;
+    font-size: 15px;
+    padding: 6px 13px;
+    flex-shrink: 0;
+}
+
+.wds-chip-confirm:hover { opacity: 0.9; }
+
+.wds-chip-cancel {
+    background: transparent;
+    border: 1.5px solid var(--border);
+    color: var(--text-secondary);
+    font-size: 15px;
+    padding: 6px 11px;
+    flex-shrink: 0;
+}
+
+.wds-chip-cancel:hover { background: var(--gray-100); }
+
 /* ============================================
    MINI LEADERBOARD
    ============================================ */

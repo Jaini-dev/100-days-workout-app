@@ -1006,6 +1006,12 @@
                     <button class="wds-chip" data-value="Walk/Run" onclick="selectWdsChip(this)">🚶 Walk/Run</button>
                     <button class="wds-chip" data-value="Swimming" onclick="selectWdsChip(this)">🏊 Swim</button>
                     <button class="wds-chip" data-value="Other" onclick="selectWdsChip(this)">🤸 Other</button>
+                    <button class="wds-chip wds-chip-add" id="wds-add-type-btn" onclick="startAddWorkoutType()">＋ Add</button>
+                </div>
+                <div id="wds-add-type-row" class="wds-add-type-row" style="display:none;">
+                    <input id="wds-add-type-field" class="wds-add-type-field" type="text" placeholder="e.g. Pilates" maxlength="20" onkeydown="if(event.key==='Enter')confirmAddWorkoutType();else if(event.key==='Escape')cancelAddWorkoutType();" />
+                    <button class="wds-chip wds-chip-confirm" onclick="confirmAddWorkoutType()">✓</button>
+                    <button class="wds-chip wds-chip-cancel" onclick="cancelAddWorkoutType()">✕</button>
                 </div>
             </div>
             <div class="wds-section">
