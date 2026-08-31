@@ -23,10 +23,10 @@ const CONFIG = {
 
 // Challenge settings (can be modified by admin)
 let challengeSettings = {
-    startDate: '2026-02-01',  // Challenge starts Feb 1
-    endDate: '2026-07-31',    // Challenge ends July 31 (181 days window)
+    startDate: '2026-09-01',  // Challenge starts Sep 1
+    endDate: '2027-02-28',    // Challenge ends Feb 28 (181 days window)
     totalDays: 100,           // Need to complete 100 workouts in this period
-    seasonName: 'Season 6'
+    seasonName: 'Season 7'
 };
 
 // ============================================
@@ -266,7 +266,7 @@ function getCurrentDay() {
 }
 
 function getChallengePeriodDays() {
-    // Returns total days in the challenge period (181 days: Feb 1 - July 31)
+    // Returns total days in the challenge period
     const start = new Date(challengeSettings.startDate);
     const end = new Date(challengeSettings.endDate);
     start.setHours(0, 0, 0, 0);
@@ -833,6 +833,10 @@ function showTab(tab) {
             showScreen('participants-screen');
             renderParticipantsScreen();
             break;
+        case 'halloffame':
+            showScreen('halloffame-screen');
+            renderHallOfFame();
+            break;
     }
 }
 
@@ -843,13 +847,18 @@ function showSettings() {
         $('settings-phone').value = appState.currentUser.phone;
         $('settings-goal').value = appState.currentUser.goal || '';
         $('settings-commitment').value = appState.currentUser.commitment || '';
-        // Load timezone setting
         const timezoneSelect = $('settings-timezone');
         if (timezoneSelect) {
             timezoneSelect.value = appState.currentUser.timezone || 'Asia/Kolkata';
         }
+        const weeklyGoalSelect = $('settings-weekly-goal');
+        if (weeklyGoalSelect) {
+            weeklyGoalSelect.value = appState.currentUser.weeklyGoal || '';
+        }
     }
     $('info-participants').textContent = appState.participants.length;
+    const infoSeasonEl = $('info-season');
+    if (infoSeasonEl) infoSeasonEl.textContent = challengeSettings.seasonName;
 
     const adminBadge = $('admin-badge');
     if (adminBadge) {
@@ -1458,6 +1467,13 @@ function updateDashboard() {
     const user = appState.currentUser;
     if (!user) return;
 
+    // Show Century Club celebration to users who already had 100+ workouts
+    // before this feature existed (fires once, then centuryClub.unlockedAt is set).
+    if (calculateTotalWorkouts(user) >= 100 && !user.centuryClub?.unlockedAt) {
+        setTimeout(checkCenturyClubUnlock, 1500);
+    }
+    renderCenturyBanner();
+
     const currentDay = getCurrentDay();
     const daysLeft = getDaysLeft();
 
@@ -1525,13 +1541,17 @@ function updateDashboard() {
         } else if (streak > 0) {
             msgEl.textContent = "Great start! Keep it going!";
         } else {
-            msgEl.textContent = "Start your streak today!";
+            msgEl.textContent = "Log today and start your streak!";
         }
     }
 
     // Stats
     const totalEl = $('total-workouts');
     if (totalEl) totalEl.textContent = totalWorkouts;
+
+    // Best streak in the secondary stat card
+    const bsEl = $('best-streak-stat');
+    if (bsEl) bsEl.textContent = calculateBestStreak(user);
 
     const rate = currentDay > 0 ? Math.round((totalWorkouts / currentDay) * 100) : 0;
     const rateEl = $('completion-rate');
@@ -1583,6 +1603,9 @@ function updateDashboard() {
     // Personal progress section (replaces workouts needed)
     renderPersonalProgress(user);
 
+    // Weekly goal progress strip
+    renderWeeklyGoal();
+
     // Check-in status
     const todayDate = getTodayString();
     const todayCheckin = user.checkins ? user.checkins[todayDate] : null;
@@ -1605,6 +1628,98 @@ function updateDashboard() {
     saveData();
 }
 
+function renderWeeklyGoal() {
+    const container = $('weekly-goal-strip');
+    if (!container) return;
+    const user = appState.currentUser;
+    if (!user || !user.weeklyGoal) { container.style.display = 'none'; return; }
+
+    const goal = parseInt(user.weeklyGoal);
+    const thisWeek = calculateWeeklyImprovement(user).thisWeek;
+    const over = thisWeek >= goal;
+
+    const dots = Array.from({ length: goal }, (_, i) =>
+        `<span class="week-dot${i < thisWeek ? ' done' : ''}"></span>`
+    ).join('');
+
+    let msg;
+    if (thisWeek === 0) msg = `🎯 Goal: ${goal} workouts this week`;
+    else if (over) msg = `🔥 ${thisWeek}/${goal} — weekly goal crushed!`;
+    else msg = `💪 ${thisWeek} of ${goal} this week`;
+
+    container.style.display = 'block';
+    container.innerHTML = `<div class="weekly-goal-inner${over ? ' goal-done' : ''}">
+        <span class="weekly-goal-text">${msg}</span>
+        <div class="weekly-goal-dots">${dots}</div>
+    </div>`;
+}
+
+let _wdsDate = null;
+
+function showWorkoutDetailsSheet(dateStr) {
+    _wdsDate = dateStr;
+    const existing = (appState.currentUser?.checkinDetails || {})[dateStr] || {};
+    document.querySelectorAll('.wds-chip').forEach(c => c.classList.remove('selected'));
+    if (existing.type) {
+        const tc = document.querySelector(`#wds-type-chips [data-value="${existing.type}"]`);
+        if (tc) tc.classList.add('selected');
+    }
+    if (existing.mood) {
+        const mc = document.querySelector(`#wds-mood-chips [data-value="${existing.mood}"]`);
+        if (mc) mc.classList.add('selected');
+    }
+    const noteEl = $('wds-note');
+    if (noteEl) noteEl.value = existing.note || '';
+    const sheet = $('workout-details-sheet');
+    if (sheet) {
+        sheet.style.display = 'flex';
+        requestAnimationFrame(() => sheet.classList.add('wds-visible'));
+    }
+}
+
+function dismissWorkoutDetails() {
+    const sheet = $('workout-details-sheet');
+    if (!sheet) return;
+    sheet.classList.remove('wds-visible');
+    setTimeout(() => { if (!sheet.classList.contains('wds-visible')) sheet.style.display = 'none'; }, 300);
+    _wdsDate = null;
+}
+
+function selectWdsChip(el) {
+    const container = el.closest('.wds-chips');
+    if (container) container.querySelectorAll('.wds-chip').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+}
+
+function saveWorkoutDetails() {
+    if (!_wdsDate || !appState.currentUser) { dismissWorkoutDetails(); return; }
+    const typeEl = document.querySelector('#wds-type-chips .wds-chip.selected');
+    const moodEl = document.querySelector('#wds-mood-chips .wds-chip.selected');
+    const note = ($('wds-note')?.value || '').trim();
+    if (!typeEl && !moodEl && !note) { dismissWorkoutDetails(); return; }
+
+    if (!appState.currentUser.checkinDetails) appState.currentUser.checkinDetails = {};
+    appState.currentUser.checkinDetails[_wdsDate] = {
+        type: typeEl?.dataset.value || null,
+        mood: moodEl?.dataset.value || null,
+        note: note || null
+    };
+    const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
+    if (idx >= 0) {
+        if (!appState.participants[idx].checkinDetails) appState.participants[idx].checkinDetails = {};
+        appState.participants[idx].checkinDetails[_wdsDate] = appState.currentUser.checkinDetails[_wdsDate];
+    }
+    saveData();
+    dismissWorkoutDetails();
+    showToast('Details saved! 📝', 'success');
+    if (appState.currentTab === 'calendar') renderCalendar();
+}
+
+function getWorkoutTypeIcon(type) {
+    const icons = { Strength: '🏋️', Cardio: '🏃', Yoga: '🧘', Sports: '⚽', 'Walk/Run': '🚶', Swimming: '🏊', Other: '🤸' };
+    return icons[type] || '💪';
+}
+
 function renderPersonalProgress(user) {
     const container = $('personal-progress-section');
     if (!container) return;
@@ -1618,15 +1733,15 @@ function renderPersonalProgress(user) {
     progressHtml += '<div class="progress-header">📈 Your Progress</div>';
     progressHtml += '<div class="progress-stats">';
 
-    // Current vs Best Streak
+    // This week vs streak (total days is now hero card)
     progressHtml += `
         <div class="progress-stat">
-            <span class="progress-value">${currentStreak}</span>
-            <span class="progress-label">Current Streak</span>
+            <span class="progress-value">${weeklyStats.thisWeek}</span>
+            <span class="progress-label">This Week 💪</span>
         </div>
         <div class="progress-stat">
-            <span class="progress-value">${bestStreak}</span>
-            <span class="progress-label">Best Streak</span>
+            <span class="progress-value">${currentStreak}</span>
+            <span class="progress-label">🔥 Streak</span>
         </div>
     `;
 
@@ -1792,6 +1907,11 @@ async function submitCheckin(status, dateStr = null) {
 
     if (!dateStr) {
         showCelebration(status);
+    }
+
+    if (status === 'Y') {
+        setTimeout(() => checkCenturyClubUnlock(), 600);
+        setTimeout(() => showWorkoutDetailsSheet(targetDate), 1400);
     }
 
     setTimeout(() => {
@@ -2700,11 +2820,13 @@ function renderCalendar() {
             // Make days clickable if within edit window (for adding, editing, or deleting)
             const clickable = canEdit ? 'clickable' : '';
             const onClick = clickable ? `onclick="openDayEditor('${dateStr}', '${checkin || ''}')"` : '';
+            const details = checkin === 'Y' ? ((user.checkinDetails || {})[dateStr] || null) : null;
+            const detailBadge = details?.type ? `<span class="cal-detail-icon" title="${details.type}">${getWorkoutTypeIcon(details.type)}</span>` : '';
 
             html += `
-                <div class="cal-day ${statusClass} ${clickable}" ${onClick} title="Day ${i + 1} - ${formatShortDate(date)}">
+                <div class="cal-day ${statusClass} ${clickable}" ${onClick} title="Day ${i + 1} - ${formatShortDate(date)}${details ? ' — ' + details.type : ''}">
                     <span class="cal-date">${date.getDate()}</span>
-                    <span class="cal-day-num">D${i + 1}</span>
+                    ${detailBadge}
                 </div>
             `;
         });
@@ -3663,18 +3785,42 @@ function showSpreadsheetView() {
 // ============================================
 // MODAL FUNCTIONS
 // ============================================
+let _bodyScrollY = 0;
+
+function lockBodyScroll() {
+    if (document.body.classList.contains('modal-open')) return;
+    _bodyScrollY = window.scrollY || window.pageYOffset || 0;
+    document.body.style.top = `-${_bodyScrollY}px`;
+    document.body.classList.add('modal-open');
+    // Force-hide the floating menu button so it can't overlap modal controls
+    const hb = $('hamburger-btn');
+    if (hb) hb.style.display = 'none';
+}
+
+function unlockBodyScroll() {
+    if (!document.body.classList.contains('modal-open')) return;
+    document.body.classList.remove('modal-open');
+    document.body.style.top = '';
+    window.scrollTo(0, _bodyScrollY);
+    const hb = $('hamburger-btn');
+    if (hb) hb.style.display = '';
+}
+
 function openModal(modalId) {
     const modal = $(modalId);
     if (modal) modal.classList.add('active');
+    lockBodyScroll();
 }
 
 function closeModal(modalId) {
     const modal = $(modalId);
     if (modal) modal.classList.remove('active');
+    if (!document.querySelector('.modal.active')) unlockBodyScroll();
 }
 
 function closeAnyModal() {
     document.querySelectorAll('.modal.active').forEach(m => m.classList.remove('active'));
+    unlockBodyScroll();
 }
 
 // ============================================
@@ -3685,6 +3831,8 @@ function saveSettings() {
     const goal = $('settings-goal').value.trim();
     const commitment = $('settings-commitment').value.trim();
     const timezone = $('settings-timezone') ? $('settings-timezone').value : 'Asia/Kolkata';
+    const weeklyGoalRaw = $('settings-weekly-goal') ? $('settings-weekly-goal').value : '';
+    const weeklyGoal = weeklyGoalRaw ? parseInt(weeklyGoalRaw) : null;
 
     if (!name) {
         showToast('Name cannot be empty', 'error');
@@ -3695,6 +3843,7 @@ function saveSettings() {
     appState.currentUser.goal = goal;
     appState.currentUser.commitment = commitment;
     appState.currentUser.timezone = timezone;
+    appState.currentUser.weeklyGoal = weeklyGoal;
 
     const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
     if (idx >= 0) {
@@ -3702,6 +3851,7 @@ function saveSettings() {
         appState.participants[idx].goal = goal;
         appState.participants[idx].commitment = commitment;
         appState.participants[idx].timezone = timezone;
+        appState.participants[idx].weeklyGoal = weeklyGoal;
     }
 
     saveData();
@@ -3909,6 +4059,10 @@ window.quickLogFromCalendar = quickLogFromCalendar;
 window.quickLogSubmit = quickLogSubmit;
 window.quickLogDelete = quickLogDelete;
 window.openDayEditor = openDayEditor;
+window.showWorkoutDetailsSheet = showWorkoutDetailsSheet;
+window.dismissWorkoutDetails = dismissWorkoutDetails;
+window.selectWdsChip = selectWdsChip;
+window.saveWorkoutDetails = saveWorkoutDetails;
 window.handleReminderAction = handleReminderAction;
 window.enableReminders = enableReminders;
 window.dismissGoalReminder = dismissGoalReminder;
@@ -3926,3 +4080,871 @@ window.refreshSummary = refreshSummary;
 window.refreshDashboard = refreshDashboard;
 window.renderAdminDashboard = renderAdminDashboard;
 // Demo data removed - cloud sync only
+
+// ============================================
+// CENTURY CLUB — 100 days celebration
+// ============================================
+
+let _confettiFrame = null;
+let _confettiParticles = [];
+
+function checkCenturyClubUnlock() {
+    const user = appState.currentUser;
+    if (!user) return;
+    const total = calculateTotalWorkouts(user);
+    if (total < 100) return;
+
+    // Only pop once — if they already have the club data, skip
+    if (user.centuryClub && user.centuryClub.unlockedAt) return;
+
+    // Mark unlocked
+    if (!user.centuryClub) user.centuryClub = {};
+    user.centuryClub.unlockedAt = new Date().toISOString();
+    user.centuryClub.cardClaimed = false;
+
+    const idx = appState.participants.findIndex(p => p.phone === user.phone);
+    if (idx >= 0) appState.participants[idx].centuryClub = user.centuryClub;
+    saveData();
+
+    showCenturyClubCelebration();
+}
+
+// Dashboard banner: a persistent way for completers to make/share their card
+// later if they didn't do it from the popup. Hidden once they've shared.
+function renderCenturyBanner() {
+    const el = $('century-banner');
+    if (!el) return;
+    const user = appState.currentUser;
+    if (!user) { el.style.display = 'none'; return; }
+    const cc = user.centuryClub || {};
+    if (calculateTotalWorkouts(user) >= 100 && !cc.shared) {
+        el.style.display = '';
+        el.innerHTML = `
+            <div class="cb-emoji">🎉</div>
+            <div class="cb-text">
+                <strong>You hit 100 days!</strong>
+                <span>Create &amp; share your Century Club card</span>
+            </div>
+            <div class="cb-arrow">→</div>`;
+    } else {
+        el.style.display = 'none';
+    }
+}
+
+function showCenturyClubCelebration() {
+    const user = appState.currentUser;
+    if (!user) return;
+
+    const total = calculateTotalWorkouts(user);
+    const streak = calculateBestStreak(user);
+    const currentDay = getCurrentDay();
+    const rate = currentDay > 0 ? Math.round((total / currentDay) * 100) : 0;
+
+    $('cc-cel-name').textContent = user.name.split(' ')[0];
+    $('cc-cel-workouts').textContent = total;
+    $('cc-cel-streak').textContent = streak;
+    $('cc-cel-rate').textContent = rate + '%';
+
+    const overlay = $('century-club-overlay');
+    overlay.classList.add('active');
+
+    startConfetti();
+    setTimeout(stopConfetti, 6000);
+}
+
+function closeCenturyOverlay() {
+    $('century-club-overlay').classList.remove('active');
+    stopConfetti();
+}
+
+function startConfetti() {
+    const canvas = $('confetti-canvas');
+    if (!canvas) return;
+    canvas.style.display = 'block';
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const ctx = canvas.getContext('2d');
+
+    const colors = ['#f97316','#6366f1','#22c55e','#eab308','#ec4899','#06b6d4','#a855f7','#ef4444'];
+    _confettiParticles = Array.from({ length: 120 }, () => ({
+        x: Math.random() * canvas.width,
+        y: Math.random() * -canvas.height,
+        w: 6 + Math.random() * 9,
+        h: 4 + Math.random() * 6,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        rot: Math.random() * Math.PI * 2,
+        vx: (Math.random() - 0.5) * 3,
+        vy: 2 + Math.random() * 4,
+        vr: (Math.random() - 0.5) * 0.15,
+    }));
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        _confettiParticles.forEach(p => {
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.rot);
+            ctx.fillStyle = p.color;
+            ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+            ctx.restore();
+            p.x += p.vx;
+            p.y += p.vy;
+            p.rot += p.vr;
+            if (p.y > canvas.height) {
+                p.y = -20;
+                p.x = Math.random() * canvas.width;
+            }
+        });
+        _confettiFrame = requestAnimationFrame(draw);
+    }
+    draw();
+}
+
+function stopConfetti() {
+    if (_confettiFrame) {
+        cancelAnimationFrame(_confettiFrame);
+        _confettiFrame = null;
+    }
+    const canvas = $('confetti-canvas');
+    if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        canvas.style.display = 'none';
+    }
+}
+
+// ---- Card Builder ----
+
+const CENTURY_THEMES = {
+    cosmic:  { label: 'Cosmic',  grad: 'linear-gradient(135deg,#667eea,#764ba2)', c1:'#667eea', c2:'#764ba2', text: '#ffffff', accent: '#e9d5ff' },
+    fire:    { label: 'Fire',    grad: 'linear-gradient(135deg,#f7971e,#ffd200)', c1:'#f7971e', c2:'#ffd200', text: '#1a1a1a', accent: '#7c2d12' },
+    ocean:   { label: 'Ocean',   grad: 'linear-gradient(135deg,#2193b0,#6dd5ed)', c1:'#2193b0', c2:'#6dd5ed', text: '#ffffff', accent: '#e0f7fa' },
+    jungle:  { label: 'Jungle',  grad: 'linear-gradient(135deg,#11998e,#38ef7d)', c1:'#11998e', c2:'#38ef7d', text: '#ffffff', accent: '#073b35' },
+    sunset:  { label: 'Sunset',  grad: 'linear-gradient(135deg,#f953c6,#b91d73)', c1:'#f953c6', c2:'#b91d73', text: '#ffffff', accent: '#fce7f3' },
+};
+
+function assignCenturyTitle(user) {
+    const checkins = user.checkins || {};
+    const vals = Object.values(checkins);
+    const total = vals.filter(v => v === 'Y').length;
+    const restDays = vals.filter(v => v === 'R').length;
+    const missedDays = vals.filter(v => v === 'N').length;
+    const streak = calculateStreak(user);
+    const currentDay = getCurrentDay();
+    const rate = currentDay > 0 ? Math.round((total / currentDay) * 100) : 0;
+
+    if (restDays === 0 && missedDays === 0)    return "Zero Days Off. Literally. 💀";
+    if (total >= 130)                           return "Overachiever (Shocker) 🙄";
+    if (streak >= 50)                           return "We're a Little Scared of You 😳";
+    if (streak >= 30)                           return "The Streak Was Unreal 🚀";
+    if (rate >= 92)                             return "Suspiciously Consistent 👀";
+    if (missedDays === 0 && restDays === 0)     return "Exactly 100. Not One More. 😌";
+    if (restDays === 0)                         return "Rest Days? Never Heard of 'Em 😤";
+    if (missedDays >= 40)                       return "The Comeback Arc Was REAL 🔥";
+    if (rate < 60)                              return "Chaos Theory Actually Works 🤷";
+    if (restDays > 25)                          return "Work-Life Balance Understood 😌";
+    if (total >= 110)                           return "Couldn't Stop at 100, Could You 😅";
+    return "Showed Up Every Single Time 🫡";
+}
+
+let _cardPhotoDataUrl = null;   // dataURL string of chosen photo (persisted)
+let _cardPhotoImg = null;       // loaded Image object for canvas drawing
+let _proudSaveTimer = null;
+
+function openCardBuilder() {
+    closeCenturyOverlay();
+    const user = appState.currentUser;
+    const existing = user.centuryClub || {};
+
+    _cardPhotoDataUrl = existing.photo || null;
+    _cardPhotoImg = null;
+
+    const input = $('cc-proud-input');
+    if (input) input.value = existing.proudMoment || '';
+
+    // Set theme selection
+    const savedTheme = existing.theme || 'cosmic';
+    document.querySelectorAll('.cc-theme-dot').forEach(el => {
+        el.classList.toggle('selected', el.dataset.theme === savedTheme);
+    });
+
+    // Set template selection
+    const savedTpl = existing.template || 'pop';
+    document.querySelectorAll('.cc-tpl-pill').forEach(el => {
+        el.classList.toggle('selected', el.dataset.tpl === savedTpl);
+    });
+
+    // Reset photo status label + carousel to the first panel
+    ccSetPhotoStatus(!!_cardPhotoDataUrl);
+    const carousel = $('cc-carousel');
+    if (carousel) carousel.scrollLeft = 0;
+    ccSyncDots();
+
+    openModal('card-builder-modal');
+
+    // Load saved photo (if any) then draw
+    if (_cardPhotoDataUrl) {
+        loadCardPhoto(_cardPhotoDataUrl, refreshCardPreview);
+    } else {
+        refreshCardPreview();
+    }
+    // Redraw once web fonts are ready so text uses Inter
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(refreshCardPreview);
+    }
+}
+
+function ccSetPhotoStatus(hasPhoto) {
+    const el = $('cc-photo-status');
+    if (el) el.textContent = hasPhoto ? '✓ Photo added — tap to change' : 'Tap to choose a photo';
+}
+
+// Sync the little progress dots to the carousel scroll position
+function ccSyncDots() {
+    const c = $('cc-carousel');
+    const dots = document.querySelectorAll('#cc-dots .cc-dot');
+    if (!c || !dots.length) return;
+    const panels = c.querySelectorAll('.cc-panel');
+    if (panels.length < 2) return;
+    const step = panels[1].offsetLeft - panels[0].offsetLeft;
+    const idx = Math.max(0, Math.min(dots.length - 1, Math.round(c.scrollLeft / step)));
+    dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+}
+
+function ccGoPanel(i) {
+    const c = $('cc-carousel');
+    if (!c) return;
+    const panels = c.querySelectorAll('.cc-panel');
+    if (panels[i]) c.scrollTo({ left: panels[i].offsetLeft - panels[0].offsetLeft, behavior: 'smooth' });
+}
+
+function loadCardPhoto(dataUrl, cb) {
+    const img = new Image();
+    img.onload = () => { _cardPhotoImg = img; if (cb) cb(); };
+    img.src = dataUrl;
+}
+
+function handleCenturyPhoto(input) {
+    const file = input.files[0];
+    if (!file) return;
+    showToast('Adding your photo…', '');
+    const reader = new FileReader();
+    reader.onload = e => {
+        const raw = new Image();
+        raw.onload = () => {
+            // Downscale + compress so it fits in localStorage and draws fast.
+            // Raw phone photos are several MB; we shrink to ~500px JPEG (~50KB).
+            const max = 600;
+            const scale = Math.min(1, max / Math.max(raw.width, raw.height));
+            const c = document.createElement('canvas');
+            c.width = Math.round(raw.width * scale);
+            c.height = Math.round(raw.height * scale);
+            c.getContext('2d').drawImage(raw, 0, 0, c.width, c.height);
+            try {
+                _cardPhotoDataUrl = c.toDataURL('image/jpeg', 0.82);
+            } catch (err) {
+                _cardPhotoDataUrl = e.target.result;
+            }
+            loadCardPhoto(_cardPhotoDataUrl, () => { refreshCardPreview(); persistCenturyCard(); ccSetPhotoStatus(true); });
+        };
+        raw.onerror = () => showToast("Couldn't read that image — try another", 'error');
+        raw.src = e.target.result;
+    };
+    reader.onerror = () => showToast("Couldn't read that file", 'error');
+    reader.readAsDataURL(file);
+}
+
+function getSelectedTheme() {
+    const el = document.querySelector('.cc-theme-dot.selected');
+    return (el && el.dataset.theme) ? el.dataset.theme : 'cosmic';
+}
+
+function selectCCTheme(dot) {
+    document.querySelectorAll('.cc-theme-dot').forEach(d => d.classList.remove('selected'));
+    dot.classList.add('selected');
+    refreshCardPreview();
+    persistCenturyCard();
+}
+
+function onProudInput() {
+    refreshCardPreview();
+    clearTimeout(_proudSaveTimer);
+    _proudSaveTimer = setTimeout(persistCenturyCard, 400);
+}
+
+// Quietly persist the card choices so the Hall of Fame stays in sync.
+// No toast, no navigation — Hall of Fame is automatic.
+function persistCenturyCard() {
+    const user = appState.currentUser;
+    if (!user) return;
+    if (!user.centuryClub) user.centuryClub = {};
+    if (!user.centuryClub.unlockedAt) user.centuryClub.unlockedAt = new Date().toISOString();
+
+    user.centuryClub.photo = _cardPhotoDataUrl || null;
+    user.centuryClub.proudMoment = ($('cc-proud-input') && $('cc-proud-input').value.trim()) || '';
+    user.centuryClub.title = assignCenturyTitle(user);
+    user.centuryClub.theme = getSelectedTheme();
+    user.centuryClub.template = getSelectedTemplate();
+
+    const idx = appState.participants.findIndex(p => p.phone === user.phone);
+    if (idx >= 0) appState.participants[idx].centuryClub = user.centuryClub;
+    saveData();
+}
+
+// ---- Canvas card rendering (this IS what gets shared) ----
+
+function ccRoundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+}
+
+function ccWrapLines(ctx, text, maxWidth) {
+    const words = text.split(' ');
+    const lines = [];
+    let line = '';
+    for (const w of words) {
+        const test = line ? line + ' ' + w : w;
+        if (ctx.measureText(test).width > maxWidth && line) {
+            lines.push(line);
+            line = w;
+        } else {
+            line = test;
+        }
+    }
+    if (line) lines.push(line);
+    return lines;
+}
+
+function ccFitFont(ctx, txt, weight, startPx, minPx, maxW, font) {
+    let s = startPx;
+    ctx.font = `${weight} ${s}px ${font}`;
+    while (ctx.measureText(txt).width > maxW && s > minPx) {
+        s -= 2;
+        ctx.font = `${weight} ${s}px ${font}`;
+    }
+    return s;
+}
+
+function ccCardData() {
+    const user = appState.currentUser;
+    const theme = CENTURY_THEMES[getSelectedTheme()] || CENTURY_THEMES.cosmic;
+    const total = calculateTotalWorkouts(user);
+    const currentDay = getCurrentDay();
+    return {
+        user: user,
+        theme: theme,
+        name: user.name,
+        title: assignCenturyTitle(user),
+        proud: ($('cc-proud-input') && $('cc-proud-input').value.trim()) || 'Showed up. Every. Single. Day.',
+        total: total,
+        streak: calculateBestStreak(user),
+        rate: currentDay > 0 ? Math.round((total / currentDay) * 100) : 0,
+        dark: theme.text === '#1a1a1a',
+        font: "'Inter', -apple-system, 'Helvetica Neue', Arial, sans-serif",
+        season: challengeSettings.seasonName
+    };
+}
+
+function getSelectedTemplate() {
+    const el = document.querySelector('.cc-tpl-pill.selected');
+    return (el && el.dataset.tpl) ? el.dataset.tpl : 'pop';
+}
+
+function selectCCTemplate(pill) {
+    document.querySelectorAll('.cc-tpl-pill').forEach(p => p.classList.remove('selected'));
+    pill.classList.add('selected');
+    refreshCardPreview();
+    persistCenturyCard();
+}
+
+function ccBg(ctx, W, H, c1, c2, diag) {
+    const g = diag ? ctx.createLinearGradient(0, 0, W, H) : ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, c1);
+    g.addColorStop(1, c2);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+}
+
+function ccDrawCirclePhoto(ctx, cx, cy, r, ringColor, ringW, dark) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.closePath();
+    if (_cardPhotoImg) {
+        ctx.save();
+        ctx.clip();
+        const img = _cardPhotoImg;
+        const sc = Math.max((r * 2) / img.width, (r * 2) / img.height);
+        const dw = img.width * sc, dh = img.height * sc;
+        ctx.drawImage(img, cx - dw / 2, cy - dh / 2, dw, dh);
+        ctx.restore();
+    } else {
+        ctx.fillStyle = dark ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,0.22)';
+        ctx.fill();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = '110px sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('💪', cx, cy + 6);
+    }
+    if (ringW) {
+        ctx.lineWidth = ringW;
+        ctx.strokeStyle = ringColor;
+        ctx.stroke();
+    }
+    ctx.restore();
+}
+
+function ccDrawRectPhoto(ctx, x, y, w, h, r) {
+    ctx.save();
+    ccRoundRect(ctx, x, y, w, h, r);
+    ctx.clip();
+    if (_cardPhotoImg) {
+        const img = _cardPhotoImg;
+        const sc = Math.max(w / img.width, h / img.height);
+        const dw = img.width * sc, dh = img.height * sc;
+        ctx.drawImage(img, x + w / 2 - dw / 2, y + h / 2 - dh / 2, dw, dh);
+    } else {
+        ctx.fillStyle = '#e5e7eb';
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#9ca3af';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = '130px sans-serif';
+        ctx.fillText('💪', x + w / 2, y + h / 2);
+    }
+    ctx.restore();
+}
+
+function refreshCardPreview() {
+    const canvas = $('cc-card-canvas');
+    if (!canvas) return;
+    const user = appState.currentUser;
+    if (!user) return;
+    const W = 1080, H = 1350;
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    const d = ccCardData();
+    const fn = { pop: ccTplPop, bold: ccTplBold, polaroid: ccTplPolaroid, ticket: ccTplTicket }[getSelectedTemplate()] || ccTplPop;
+    fn(ctx, W, H, d);
+}
+
+/* ---- Variant 1: Confetti Pop ---- */
+function ccTplPop(ctx, W, H, d) {
+    const cx = W / 2, font = d.font, text = d.theme.text, dark = d.dark;
+    const softText = dark ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.85)';
+    const chipBg = dark ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.16)';
+    const lightInk = dark ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.95)';
+    ccBg(ctx, W, H, d.theme.c1, d.theme.c2, true);
+
+    ctx.save();
+    ctx.globalAlpha = 0.10;
+    ctx.fillStyle = '#ffffff';
+    [[-60,-40,300],[W+60,220,260],[-40,H-120,280],[W+40,H+40,340]].forEach(function(p){ ctx.beginPath(); ctx.arc(p[0],p[1],p[2],0,Math.PI*2); ctx.fill(); });
+    ctx.restore();
+
+    const confetti = [[70,120,16,'#ffd200'],[1000,90,20,'#ff5fa2'],[930,250,12,'#5fd0ff'],[150,300,12,'#7CFFB2'],[60,520,10,'#ffffff'],[1025,560,12,'#ffd200'],[90,1180,18,'#5fd0ff'],[1000,1150,16,'#ff5fa2'],[200,1255,13,'#ffd200'],[880,1270,14,'#7CFFB2'],[1015,1265,9,'#ffffff'],[120,1280,9,'#ffffff']];
+    ctx.save();
+    ctx.globalAlpha = 0.85;
+    confetti.forEach(function(p){ ctx.fillStyle=p[3]; ctx.beginPath(); ctx.arc(p[0],p[1],p[2],0,Math.PI*2); ctx.fill(); });
+    ctx.restore();
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const bannerTxt = '🏆  CENTURY CLUB';
+    ctx.font = '800 40px ' + font;
+    const bw = ctx.measureText(bannerTxt).width + 80, bh = 76, by = 70;
+    ctx.save();
+    ccRoundRect(ctx, cx - bw/2, by, bw, bh, bh/2);
+    ctx.fillStyle = dark ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.22)';
+    ctx.fill();
+    ctx.fillStyle = lightInk;
+    ctx.fillText(bannerTxt, cx, by + bh/2 + 2);
+    ctx.restore();
+
+    const cy = 340, r = 172;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, cy, r + 14, 0, Math.PI*2);
+    ctx.fillStyle = dark ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.35)';
+    ctx.fill();
+    ctx.restore();
+    ccDrawCirclePhoto(ctx, cx, cy, r, dark ? 'rgba(0,0,0,0.4)' : '#ffffff', 12, dark);
+
+    const bx = cx + r*0.72, byy = cy + r*0.72;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(bx, byy, 54, 0, Math.PI*2);
+    ctx.fillStyle = '#ffffff'; ctx.fill();
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.font = '58px sans-serif'; ctx.fillText('💯', bx, byy + 4);
+    ctx.restore();
+
+    ctx.fillStyle = text;
+    const nameSize = ccFitFont(ctx, d.name, '900', 78, 48, W - 160, font);
+    ctx.font = '900 ' + nameSize + 'px ' + font;
+    ctx.fillText(d.name, cx, 580);
+
+    const titleSize = ccFitFont(ctx, d.title, '800', 40, 26, W - 200, font);
+    ctx.font = '800 ' + titleSize + 'px ' + font;
+    const titleW = ctx.measureText(d.title).width, pillH = 72, pillW = titleW + 72, pillY = 632;
+    ctx.save();
+    ccRoundRect(ctx, cx - pillW/2, pillY, pillW, pillH, pillH/2);
+    ctx.fillStyle = dark ? 'rgba(0,0,0,0.16)' : 'rgba(0,0,0,0.22)';
+    ctx.fill();
+    ctx.fillStyle = lightInk;
+    ctx.font = '800 ' + titleSize + 'px ' + font;
+    ctx.fillText(d.title, cx, pillY + pillH/2 + 2);
+    ctx.restore();
+
+    ctx.font = 'italic 600 42px ' + font;
+    const lines = ccWrapLines(ctx, '“' + d.proud + '”', W - 260).slice(0,3);
+    const lineH = 56, boxPadY = 38;
+    const boxH = lines.length*lineH + boxPadY*2 - 16, boxW = W - 200, boxY = 770;
+    ctx.save();
+    ccRoundRect(ctx, cx - boxW/2, boxY, boxW, boxH, 30);
+    ctx.fillStyle = dark ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.16)';
+    ctx.fill();
+    ctx.fillStyle = text;
+    let ty = boxY + boxPadY + lineH/2;
+    lines.forEach(function(ln){ ctx.fillText(ln, cx, ty); ty += lineH; });
+    ctx.restore();
+
+    const chipY = boxY + boxH + 50, chipH = 184, gap = 26, sideMargin = 60;
+    const chipW = (W - sideMargin*2 - gap*2)/3;
+    const cols = [{num:String(d.total),lbl:'WORKOUTS',emo:'🏋️'},{num:String(d.streak),lbl:'BEST STREAK',emo:'🔥'},{num:d.rate+'%',lbl:'CONSISTENCY',emo:'🎯'}];
+    cols.forEach(function(c,i){
+        const x = sideMargin + i*(chipW+gap);
+        ctx.save(); ccRoundRect(ctx, x, chipY, chipW, chipH, 26); ctx.fillStyle = chipBg; ctx.fill(); ctx.restore();
+        const ccx = x + chipW/2;
+        ctx.fillStyle = text; ctx.font = '40px sans-serif'; ctx.fillText(c.emo, ccx, chipY + 46);
+        ctx.font = '900 64px ' + font; ctx.fillText(c.num, ccx, chipY + 104);
+        ctx.fillStyle = softText; ctx.font = '700 24px ' + font; ctx.fillText(c.lbl, ccx, chipY + 150);
+    });
+
+    ctx.fillStyle = softText; ctx.font = '600 28px ' + font;
+    ctx.fillText('100 Days of Workout · ' + d.season, cx, H - 60);
+}
+
+/* ---- Variant 2: Bold Minimal ---- */
+function ccTplBold(ctx, W, H, d) {
+    const cx = W/2, font = d.font, text = d.theme.text, dark = d.dark;
+    const softText = dark ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.8)';
+    ccBg(ctx, W, H, d.theme.c2, d.theme.c1, false);
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+
+    ctx.save();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = dark ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.5)';
+    ccRoundRect(ctx, 46, 46, W-92, H-92, 36);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = softText;
+    ctx.font = '800 30px ' + font;
+    ctx.fillText('★  THE CENTURY CLUB  ★', cx, 140);
+
+    ccDrawCirclePhoto(ctx, cx, 340, 155, dark?'rgba(0,0,0,0.4)':'#ffffff', 10, dark);
+
+    ctx.fillStyle = text;
+    const nameSize = ccFitFont(ctx, d.name, '900', 96, 52, W - 200, font);
+    ctx.font = '900 ' + nameSize + 'px ' + font;
+    ctx.fillText(d.name, cx, 560);
+
+    const titleSize = ccFitFont(ctx, d.title, '700', 38, 26, W - 220, font);
+    ctx.font = '700 ' + titleSize + 'px ' + font;
+    ctx.fillStyle = softText;
+    ctx.fillText(d.title, cx, 636);
+
+    ctx.strokeStyle = dark?'rgba(0,0,0,0.3)':'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(cx-90, 700); ctx.lineTo(cx+90, 700); ctx.stroke();
+
+    ctx.fillStyle = text;
+    ctx.font = 'italic 600 44px ' + font;
+    const lines = ccWrapLines(ctx, '“'+d.proud+'”', W-260).slice(0,3);
+    let ty = 800;
+    lines.forEach(function(ln){ ctx.fillText(ln, cx, ty); ty += 58; });
+
+    ctx.fillStyle = text;
+    ctx.font = '900 130px ' + font;
+    ctx.fillText('100', cx, 1015);
+    ctx.font = '800 34px ' + font;
+    ctx.fillStyle = softText;
+    ctx.fillText('DAYS DONE', cx, 1090);
+
+    const cols=[[String(d.total),'WORKOUTS'],[String(d.streak),'BEST STREAK'],[d.rate+'%','RATE']];
+    const colX=[W*0.27,W*0.5,W*0.73], sy=1205;
+    ctx.strokeStyle = dark?'rgba(0,0,0,0.25)':'rgba(255,255,255,0.4)';
+    ctx.lineWidth=2;
+    [W*0.385,W*0.615].forEach(function(x){ ctx.beginPath(); ctx.moveTo(x,sy-30); ctx.lineTo(x,sy+44); ctx.stroke(); });
+    cols.forEach(function(c,i){
+        ctx.fillStyle=text; ctx.font='900 60px ' + font; ctx.fillText(c[0],colX[i],sy);
+        ctx.fillStyle=softText; ctx.font='700 22px ' + font; ctx.fillText(c[1],colX[i],sy+50);
+    });
+}
+
+/* ---- Variant 3: Polaroid ---- */
+function ccTplPolaroid(ctx, W, H, d) {
+    const cx = W/2, font = d.font;
+    ccBg(ctx, W, H, d.theme.c1, d.theme.c2, true);
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+
+    const px=80, py=90, pw=W-160, ph=1180;
+    ctx.save();
+    ctx.shadowColor='rgba(0,0,0,0.3)'; ctx.shadowBlur=44; ctx.shadowOffsetY=20;
+    ccRoundRect(ctx, px, py, pw, ph, 28);
+    ctx.fillStyle='#ffffff'; ctx.fill();
+    ctx.restore();
+
+    const pad=42;
+    const innerW = pw - pad*2;
+    const imgH = Math.round(innerW * 0.74);
+    ccDrawRectPhoto(ctx, px+pad, py+pad, innerW, imgH, 18);
+
+    // Sticker emojis on the corners
+    ctx.save(); ctx.translate(px+36, py+36); ctx.rotate(-0.25); ctx.font='84px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('💯',0,0); ctx.restore();
+    ctx.save(); ctx.translate(px+pw-36, py+40); ctx.rotate(0.22); ctx.font='72px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🎉',0,0); ctx.restore();
+
+    // Caption (handwritten-ish)
+    const capTop = py+pad+imgH;
+    ctx.fillStyle='#1f2937';
+    ctx.font='italic 700 46px ' + font;
+    const lines = ccWrapLines(ctx, '“'+d.proud+'”', innerW-20).slice(0,2);
+    let ty = capTop + 64;
+    lines.forEach(function(ln){ ctx.fillText(ln, cx, ty); ty+=56; });
+
+    // Name + subtitle
+    ctx.fillStyle='#6d28d9';
+    const ns = ccFitFont(ctx, d.name, '900', 52, 32, innerW-20, font);
+    ctx.font='900 ' + ns + 'px ' + font;
+    ctx.fillText(d.name, cx, ty+34);
+    ctx.fillStyle='#9ca3af';
+    ctx.font='700 24px ' + font;
+    ctx.fillText('100 DAYS DONE · ' + d.season.toUpperCase(), cx, ty+82);
+
+    // Stats strip INSIDE the card, neatly formatted
+    const stripTop = py + ph - 150;
+    ctx.strokeStyle = '#ececed';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(px+pad, stripTop); ctx.lineTo(px+pw-pad, stripTop); ctx.stroke();
+
+    const cols=[[String(d.total),'WORKOUTS'],[String(d.streak),'BEST STREAK'],[d.rate+'%','CONSISTENCY']];
+    const colX=[px+pw*0.25, px+pw*0.5, px+pw*0.75];
+    // light separators
+    ctx.strokeStyle = '#f1f1f2';
+    [px+pw*0.375, px+pw*0.625].forEach(function(x){ ctx.beginPath(); ctx.moveTo(x, stripTop+30); ctx.lineTo(x, stripTop+110); ctx.stroke(); });
+    cols.forEach(function(c,i){
+        ctx.fillStyle='#1f2937'; ctx.font='900 56px ' + font; ctx.fillText(c[0], colX[i], stripTop+62);
+        ctx.fillStyle='#9ca3af'; ctx.font='700 21px ' + font; ctx.fillText(c[1], colX[i], stripTop+108);
+    });
+}
+
+/* ---- Variant 4: Ticket Stub ---- */
+function ccTplTicket(ctx, W, H, d) {
+    const cx=W/2, font=d.font, text=d.theme.text, dark=d.dark;
+    const softText = dark?'rgba(0,0,0,0.55)':'rgba(255,255,255,0.82)';
+    ccBg(ctx, W, H, d.theme.c1, d.theme.c2, true);
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+
+    const tx=70, tyTop=150, tw=W-140, th=1050;
+    ctx.save();
+    ccRoundRect(ctx, tx, tyTop, tw, th, 34);
+    ctx.fillStyle = dark?'rgba(255,255,255,0.22)':'rgba(255,255,255,0.14)';
+    ctx.fill();
+    ctx.restore();
+
+    ctx.fillStyle = softText;
+    ctx.font = '800 30px ' + font;
+    ctx.fillText('🎟  ADMIT ONE  ·  CENTURY CLUB', cx, tyTop+70);
+
+    ccDrawCirclePhoto(ctx, cx, tyTop+255, 150, dark?'rgba(0,0,0,0.35)':'#ffffff', 10, dark);
+
+    ctx.fillStyle=text;
+    const nameSize=ccFitFont(ctx,d.name,'900',74,46,tw-120,font);
+    ctx.font='900 ' + nameSize + 'px ' + font;
+    ctx.fillText(d.name, cx, tyTop+450);
+
+    const titleSize=ccFitFont(ctx,d.title,'700',34,24,tw-140,font);
+    ctx.font='700 ' + titleSize + 'px ' + font;
+    ctx.fillStyle=softText;
+    ctx.fillText(d.title, cx, tyTop+518);
+
+    ctx.fillStyle=text;
+    ctx.font='italic 600 38px ' + font;
+    const lines=ccWrapLines(ctx,'“'+d.proud+'”',tw-140).slice(0,2);
+    let ty=tyTop+590;
+    lines.forEach(function(ln){ ctx.fillText(ln,cx,ty); ty+=50; });
+
+    const perfY = tyTop+760;
+    [tx, tx+tw].forEach(function(nx){
+        ctx.save();
+        ctx.beginPath(); ctx.arc(nx, perfY, 26, 0, Math.PI*2); ctx.closePath(); ctx.clip();
+        ccBg(ctx, W, H, d.theme.c1, d.theme.c2, true);
+        ctx.restore();
+    });
+    ctx.save();
+    ctx.strokeStyle = dark?'rgba(0,0,0,0.3)':'rgba(255,255,255,0.6)';
+    ctx.lineWidth=4; ctx.setLineDash([16,14]);
+    ctx.beginPath(); ctx.moveTo(tx+40, perfY); ctx.lineTo(tx+tw-40, perfY); ctx.stroke();
+    ctx.restore();
+
+    const cols=[[String(d.total),'WORKOUTS'],[String(d.streak),'BEST STREAK'],[d.rate+'%','RATE']];
+    const colX=[tx+tw*0.22, tx+tw*0.5, tx+tw*0.78], sy=perfY+125;
+    ctx.strokeStyle=dark?'rgba(0,0,0,0.2)':'rgba(255,255,255,0.35)'; ctx.lineWidth=2;
+    [tx+tw*0.36, tx+tw*0.64].forEach(function(x){ ctx.beginPath(); ctx.moveTo(x,sy-34); ctx.lineTo(x,sy+44); ctx.stroke(); });
+    cols.forEach(function(c,i){
+        ctx.fillStyle=text; ctx.font='900 58px ' + font; ctx.fillText(c[0],colX[i],sy);
+        ctx.fillStyle=softText; ctx.font='700 22px ' + font; ctx.fillText(c[1],colX[i],sy+50);
+    });
+
+    ctx.fillStyle=softText; ctx.font='700 25px ' + font;
+    ctx.fillText('100 DAYS OF WORKOUT · ' + d.season.toUpperCase(), cx, tyTop+th-44);
+}
+
+function ccShareCaption() {
+    const user = appState.currentUser;
+    const total = calculateTotalWorkouts(user);
+    const streak = calculateBestStreak(user);
+    return `💯 I just completed 100 days of workouts!\n🏋️ ${total} workouts · 🔥 ${streak} day best streak\n\n#100DaysWorkout #CenturyClub`;
+}
+
+// Convert a dataURL to a Blob synchronously (so navigator.share keeps the
+// user-activation — async toBlob breaks the gesture on iOS and share silently fails).
+function ccDataURLToBlob(dataUrl) {
+    const [head, b64] = dataUrl.split(',');
+    const mime = head.match(/:(.*?);/)[1];
+    const bin = atob(b64);
+    const len = bin.length;
+    const arr = new Uint8Array(len);
+    for (let i = 0; i < len; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type: mime });
+}
+
+let _ccSharing = false;
+
+function shareCenturyCard() {
+    if (_ccSharing) return;             // guard against double-taps
+    const canvas = $('cc-card-canvas');
+    if (!canvas) return;
+
+    const btn = document.querySelector('.cc-share-btn');
+    const orig = btn ? btn.innerHTML : '';
+    _ccSharing = true;
+    if (btn) { btn.innerHTML = '⏳ Opening share…'; btn.style.opacity = '0.75'; }
+    const reset = () => {
+        _ccSharing = false;
+        if (btn) { btn.innerHTML = orig; btn.style.opacity = ''; }
+    };
+
+    persistCenturyCard();
+    // Mark as shared so the dashboard banner / nudges stop appearing
+    const u = appState.currentUser;
+    if (u && u.centuryClub) {
+        u.centuryClub.shared = true;
+        const i = appState.participants.findIndex(p => p.phone === u.phone);
+        if (i >= 0) appState.participants[i].centuryClub = u.centuryClub;
+        saveData();
+        renderCenturyBanner();
+    }
+
+    let file;
+    try {
+        const blob = ccDataURLToBlob(canvas.toDataURL('image/png'));
+        file = new File([blob], 'my-century-card.png', { type: 'image/png' });
+    } catch (e) {
+        showToast('Could not generate image', 'error');
+        reset();
+        return;
+    }
+
+    const data = { files: [file], text: ccShareCaption() };
+    // Native file share (WhatsApp / Insta share sheet) — must stay in the gesture
+    if (navigator.share && (!navigator.canShare || navigator.canShare(data))) {
+        navigator.share(data).catch(() => {}).finally(reset);
+        return;
+    }
+    // Fallbacks
+    if (navigator.share) {
+        navigator.share({ text: ccShareCaption() }).catch(() => {});
+    }
+    ccDownloadCanvas(canvas);
+    showToast('Image saved — share it on WhatsApp 📲', 'success');
+    reset();
+}
+
+function downloadCenturyCard() {
+    const canvas = $('cc-card-canvas');
+    if (!canvas) return;
+    persistCenturyCard();
+    ccDownloadCanvas(canvas);
+    showToast('Saved to your photos! 📸', 'success');
+}
+
+function ccDownloadCanvas(canvas) {
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = 'my-century-card.png';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
+
+// ---- Hall of Fame ----
+
+function renderHallOfFame() {
+    const container = $('halloffame-container');
+    if (!container) return;
+
+    const completers = appState.participants.filter(p =>
+        calculateTotalWorkouts(p) >= 100
+    ).sort((a, b) => calculateTotalWorkouts(b) - calculateTotalWorkouts(a));
+
+    $('halloffame-count').textContent = completers.length;
+
+    if (completers.length === 0) {
+        container.innerHTML = `
+            <div class="hof-empty">
+                <div class="hof-empty-icon">🏆</div>
+                <h3>No one yet — be the first!</h3>
+                <p>Complete 100 workouts to join the Century Club and have your card displayed here.</p>
+            </div>`;
+        return;
+    }
+
+    container.innerHTML = completers.map((p, i) => {
+        const club = p.centuryClub || {};
+        const theme = CENTURY_THEMES[club.theme || 'cosmic'] || CENTURY_THEMES.cosmic;
+        const total = calculateTotalWorkouts(p);
+        const streak = calculateBestStreak(p);
+        const proudMoment = club.proudMoment || '100 days of showing up!';
+        const title = club.title || assignCenturyTitle(p);
+        const photoHTML = club.photo
+            ? `<img src="${club.photo}" class="hof-card-photo" alt="">`
+            : `<div class="hof-card-photo hof-card-photo-placeholder">💪</div>`;
+        const completedDate = club.unlockedAt
+            ? new Date(club.unlockedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+            : '';
+        const rankLabel = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`;
+
+        return `
+            <div class="hof-card" style="background:${theme.grad};color:${theme.text}">
+                <div class="hof-card-rank">${rankLabel}</div>
+                <div class="hof-card-watermark">💯</div>
+                ${photoHTML}
+                <div class="hof-card-badge" style="border-color:rgba(255,255,255,0.4);color:${theme.text}">${title}</div>
+                <div class="hof-card-name">${p.name}</div>
+                <div class="hof-card-proud">"${proudMoment}"</div>
+                <div class="hof-card-stats">
+                    <span>🏋️ ${total}</span>
+                    <span>🔥 ${streak}d</span>
+                </div>
+                ${completedDate ? `<div class="hof-card-date">${completedDate}</div>` : ''}
+            </div>`;
+    }).join('');
+}
