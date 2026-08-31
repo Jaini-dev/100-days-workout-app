@@ -855,16 +855,8 @@ function showSettings() {
         if (weeklyGoalSelect) {
             weeklyGoalSelect.value = appState.currentUser.weeklyGoal || '';
         }
-        const teamInput = $('settings-team');
-        if (teamInput) teamInput.value = appState.currentUser.teamName || '';
     }
-    // Populate known teams datalist
-    const datalist = $('known-teams-list');
-    if (datalist) {
-        const teams = new Set();
-        appState.participants.forEach(p => { if (p.teamName && p.teamName.trim()) teams.add(p.teamName.trim()); });
-        datalist.innerHTML = [...teams].map(t => `<option value="${t}">`).join('');
-    }
+    _updateTeamDisplay();
     $('info-participants').textContent = appState.participants.length;
     const infoSeasonEl = $('info-season');
     if (infoSeasonEl) infoSeasonEl.textContent = challengeSettings.seasonName;
@@ -2332,6 +2324,152 @@ function renderLeaderboard(category = 'thisWeek') {
 
         list.innerHTML = html || '<p class="empty-message">No participants yet</p>';
     }
+}
+
+// ============================================
+// TEAM PICKER
+// ============================================
+function showTeamPicker() {
+    const sheet = $('team-picker-sheet');
+    if (!sheet) return;
+    sheet.style.display = 'flex';
+    requestAnimationFrame(() => sheet.classList.add('tps-visible'));
+    showTeamList();
+}
+
+function hideTeamPicker() {
+    const sheet = $('team-picker-sheet');
+    if (!sheet) return;
+    sheet.classList.remove('tps-visible');
+    setTimeout(() => { if (!sheet.classList.contains('tps-visible')) sheet.style.display = 'none'; }, 300);
+}
+
+function _tpsSetHeader(showBack, title) {
+    const backBtn = $('tps-back-btn');
+    if (backBtn) backBtn.style.visibility = showBack ? 'visible' : 'hidden';
+    const titleEl = $('tps-title');
+    if (titleEl) titleEl.textContent = title;
+}
+
+function showTeamList() {
+    _tpsSetHeader(false, 'Join a Team');
+    const enriched = getSortedParticipants('all');
+    const teamsMap = {};
+    enriched.forEach(p => {
+        const name = (p.teamName || '').trim();
+        if (!name) return;
+        const key = name.toLowerCase();
+        if (!teamsMap[key]) teamsMap[key] = { name, members: [] };
+        teamsMap[key].members.push(p);
+    });
+    const teams = Object.values(teamsMap).sort((a, b) => b.members.length - a.members.length);
+    const myKey = (appState.currentUser?.teamName || '').trim().toLowerCase();
+
+    const body = $('tps-body');
+    if (!body) return;
+    let html = '';
+
+    if (teams.length > 0) {
+        html += '<div class="tps-section-label">Existing teams</div>';
+        teams.forEach(team => {
+            const isMyTeam = myKey && team.name.toLowerCase() === myKey;
+            const preview = team.members.map(m => m.name.split(' ')[0]).slice(0, 4).join(', ') + (team.members.length > 4 ? '…' : '');
+            html += `
+                <div class="tps-team-card${isMyTeam ? ' tps-team-card-joined' : ''}" data-team="${team.name}" onclick="showTeamDetail(this.dataset.team)">
+                    <div class="tps-team-card-info">
+                        <div class="tps-team-card-name">${team.name}</div>
+                        <div class="tps-team-card-members">${team.members.length} member${team.members.length > 1 ? 's' : ''} · ${preview}</div>
+                    </div>
+                    <div class="tps-team-card-right">
+                        ${isMyTeam ? '<span class="tps-badge-joined">Joined ✓</span>' : ''}
+                        <span class="tps-chevron">›</span>
+                    </div>
+                </div>`;
+        });
+        html += '<div class="tps-divider"></div>';
+    }
+
+    html += `<button class="tps-create-btn" onclick="showCreateTeam()">＋ Create a new team</button>`;
+    if (myKey) html += `<button class="tps-leave-btn" onclick="leaveTeam()">Leave current team</button>`;
+    body.innerHTML = html;
+}
+
+function showTeamDetail(teamName) {
+    _tpsSetHeader(true, teamName);
+    const enriched = getSortedParticipants('all');
+    const members = enriched.filter(p => (p.teamName || '').trim().toLowerCase() === teamName.toLowerCase());
+    const myKey = (appState.currentUser?.teamName || '').trim().toLowerCase();
+    const isMyTeam = myKey === teamName.toLowerCase();
+
+    const body = $('tps-body');
+    if (!body) return;
+    let html = `<div class="tps-member-list">`;
+    members.sort((a, b) => b.totalWorkouts - a.totalWorkouts).forEach(m => {
+        const isMe = isCurrentUser(m);
+        const initial = (m.name || '?').charAt(0).toUpperCase();
+        html += `
+            <div class="tps-member-row${isMe ? ' tps-member-me' : ''}">
+                <div class="tps-member-avatar">${initial}</div>
+                <div class="tps-member-name">${m.name}${isMe ? ' <span class="tps-you-tag">(You)</span>' : ''}</div>
+                <div class="tps-member-stat">${m.totalWorkouts} days</div>
+            </div>`;
+    });
+    html += `</div>`;
+
+    if (isMyTeam) {
+        html += `<button class="tps-leave-btn tps-leave-btn-full" onclick="leaveTeam()">Leave this team</button>`;
+    } else {
+        html += `<button class="tps-join-btn" onclick="joinTeam('${teamName.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')">Join ${teamName} 👥</button>`;
+    }
+    body.innerHTML = html;
+}
+
+function showCreateTeam() {
+    _tpsSetHeader(true, 'Create a Team');
+    const body = $('tps-body');
+    if (!body) return;
+    body.innerHTML = `
+        <div class="tps-create-form">
+            <p class="tps-create-hint">Give your team a name. Anyone who types the exact same name will join your team automatically.</p>
+            <input id="tps-new-name" class="tps-new-team-input" type="text" placeholder="e.g. Alpha Squad" maxlength="30"
+                onkeydown="if(event.key==='Enter')confirmCreateTeam();" />
+            <button class="tps-join-btn" onclick="confirmCreateTeam()">Create & Join</button>
+        </div>`;
+    setTimeout(() => $('tps-new-name')?.focus(), 80);
+}
+
+function confirmCreateTeam() {
+    const name = ($('tps-new-name')?.value || '').trim();
+    if (!name) { showToast('Enter a team name', 'error'); return; }
+    joinTeam(name);
+}
+
+function joinTeam(teamName) {
+    if (!appState.currentUser) return;
+    appState.currentUser.teamName = teamName;
+    const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
+    if (idx >= 0) appState.participants[idx].teamName = teamName;
+    saveData();
+    _updateTeamDisplay();
+    hideTeamPicker();
+    showToast(`Joined "${teamName}" 👥`, 'success');
+}
+
+function leaveTeam() {
+    if (!appState.currentUser) return;
+    const prev = appState.currentUser.teamName;
+    appState.currentUser.teamName = null;
+    const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
+    if (idx >= 0) appState.participants[idx].teamName = null;
+    saveData();
+    _updateTeamDisplay();
+    hideTeamPicker();
+    showToast(`Left team "${prev}"`, 'success');
+}
+
+function _updateTeamDisplay() {
+    const el = $('settings-team-display');
+    if (el) el.textContent = appState.currentUser?.teamName || 'No team';
 }
 
 function renderTeamsLeaderboard() {
@@ -3959,8 +4097,6 @@ function saveSettings() {
     const timezone = $('settings-timezone') ? $('settings-timezone').value : 'Asia/Kolkata';
     const weeklyGoalRaw = $('settings-weekly-goal') ? $('settings-weekly-goal').value : '';
     const weeklyGoal = weeklyGoalRaw ? parseInt(weeklyGoalRaw) : null;
-    const teamName = ($('settings-team')?.value || '').trim() || null;
-
     if (!name) {
         showToast('Name cannot be empty', 'error');
         return;
@@ -3971,7 +4107,6 @@ function saveSettings() {
     appState.currentUser.commitment = commitment;
     appState.currentUser.timezone = timezone;
     appState.currentUser.weeklyGoal = weeklyGoal;
-    appState.currentUser.teamName = teamName;
 
     const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
     if (idx >= 0) {
@@ -3980,7 +4115,6 @@ function saveSettings() {
         appState.participants[idx].commitment = commitment;
         appState.participants[idx].timezone = timezone;
         appState.participants[idx].weeklyGoal = weeklyGoal;
-        appState.participants[idx].teamName = teamName;
     }
 
     saveData();
@@ -4192,6 +4326,14 @@ window.showWorkoutDetailsSheet = showWorkoutDetailsSheet;
 window.startAddWorkoutType = startAddWorkoutType;
 window.cancelAddWorkoutType = cancelAddWorkoutType;
 window.confirmAddWorkoutType = confirmAddWorkoutType;
+window.showTeamPicker = showTeamPicker;
+window.hideTeamPicker = hideTeamPicker;
+window.showTeamList = showTeamList;
+window.showTeamDetail = showTeamDetail;
+window.showCreateTeam = showCreateTeam;
+window.confirmCreateTeam = confirmCreateTeam;
+window.joinTeam = joinTeam;
+window.leaveTeam = leaveTeam;
 window.dismissWorkoutDetails = dismissWorkoutDetails;
 window.selectWdsChip = selectWdsChip;
 window.saveWorkoutDetails = saveWorkoutDetails;

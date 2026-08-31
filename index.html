@@ -567,11 +567,12 @@
                         <option value="7">Every day</option>
                     </select>
                 </div>
-                <div class="settings-item">
-                    <label>Team Name</label>
-                    <input type="text" id="settings-team" class="settings-input" placeholder="e.g. Alpha Squad" list="known-teams-list" autocomplete="off" maxlength="30">
-                    <datalist id="known-teams-list"></datalist>
-                    <p class="settings-hint">Same name = same team. Leave blank to stay solo.</p>
+                <div class="settings-item settings-team-item">
+                    <label>Team</label>
+                    <button class="settings-team-btn" onclick="showTeamPicker()">
+                        <span id="settings-team-display">No team</span>
+                        <span class="settings-team-chevron">›</span>
+                    </button>
                 </div>
                 <div class="settings-item settings-item-timezone">
                     <label>Your Timezone</label>
@@ -991,6 +992,19 @@
             </a>
         </div>
     </nav>
+
+    <!-- Team Picker Sheet -->
+    <div id="team-picker-sheet" class="team-picker-sheet" style="display:none;">
+        <div class="tps-backdrop" onclick="hideTeamPicker()"></div>
+        <div class="tps-content">
+            <div class="tps-header">
+                <button class="tps-back" id="tps-back-btn" onclick="showTeamList()" style="visibility:hidden;">←</button>
+                <h3 id="tps-title">Join a Team</h3>
+                <button class="tps-close" onclick="hideTeamPicker()">✕</button>
+            </div>
+            <div id="tps-body" class="tps-body"></div>
+        </div>
+    </div>
 
     <!-- Workout Details Sheet (slides up after logging a workout) -->
     <div id="workout-details-sheet" class="workout-details-sheet" style="display:none;">
