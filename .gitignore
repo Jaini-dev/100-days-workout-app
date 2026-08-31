@@ -8,6 +8,10 @@ deploy/
 SETUP-GUIDE.md
 USER-GUIDE.md
 
+# Node dependencies (test tooling only - app is static)
+node_modules/
+package-lock.json
+
 # OS files
 .DS_Store
 Thumbs.db
