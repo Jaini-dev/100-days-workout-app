@@ -1215,7 +1215,7 @@ function showTab(tab) {
             break;
         case 'leaderboard':
             showScreen('leaderboard-screen');
-            renderLeaderboard('all');
+            renderLeaderboard(appState.leaderboardCategory || 'thisWeek');
             break;
         case 'calendar':
             showScreen('calendar-screen');
@@ -1727,6 +1727,7 @@ async function handleUserRegistration() {
         commitment: commitment,
         checkins: {},
         joinDate: getTodayString(),
+        seasonSetup: { s7: true },
         isAdmin: false,
         isSuperAdmin: false
     };
@@ -4912,8 +4913,10 @@ function saveSettings() {
     const commitment = $('settings-commitment').value.trim();
     const timezone = $('settings-timezone') ? $('settings-timezone').value : 'Asia/Kolkata';
     const weeklyGoalRaw = ($('settings-weekly-goal') ? $('settings-weekly-goal').value : '').trim();
-    const weeklyGoalNum = weeklyGoalRaw ? parseInt(weeklyGoalRaw) : null;
-    const weeklyGoal = (!isNaN(weeklyGoalNum) && weeklyGoalNum > 0) ? weeklyGoalNum : null;
+    // Treat as a numeric "days/week" goal ONLY if the whole input is a number (e.g. "5"),
+    // not if it merely starts with digits (e.g. "20km per week" → text goal)
+    const isPureNumber = /^\d+$/.test(weeklyGoalRaw);
+    const weeklyGoal = (isPureNumber && parseInt(weeklyGoalRaw) > 0) ? parseInt(weeklyGoalRaw) : null;
     if (!name) {
         showToast('Name cannot be empty', 'error');
         return;

@@ -2892,8 +2892,9 @@ body.modal-open .hamburger-btn { display: none; }
 /* ============================================
    ADMIN DASHBOARD
    ============================================ */
-/* Keep admin content clear of the floating menu button */
-#admin-dashboard-screen .container {
+/* Keep content with bottom action buttons clear of the floating menu button */
+#admin-dashboard-screen .container,
+#settings-screen .container {
     padding-bottom: 96px;
 }
 
