@@ -1890,13 +1890,20 @@ function updateDashboard() {
     }
     if (nameEl) {
         const firstName = user.name.split(' ')[0];
-        let nameHtml = firstName + ' 👋';
+        nameEl.innerHTML = firstName + ' 👋';
+    }
+    // Role badge sits on the subtitle line (keeps name clean, avoids wrapping)
+    const roleBadgeEl = $('user-role-badge');
+    if (roleBadgeEl) {
         if (appState.isSuperAdmin) {
-            nameHtml = firstName + ' <span class="super-admin-badge">👑 SUPER ADMIN</span>';
+            roleBadgeEl.textContent = '👑 ADMIN';
+            roleBadgeEl.style.display = '';
         } else if (appState.isAdmin) {
-            nameHtml = firstName + ' <span class="admin-badge">ADMIN</span>';
+            roleBadgeEl.textContent = 'ADMIN';
+            roleBadgeEl.style.display = '';
+        } else {
+            roleBadgeEl.style.display = 'none';
         }
-        nameEl.innerHTML = nameHtml;
     }
 
     // Current workouts count (top right badge)

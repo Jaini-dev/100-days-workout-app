@@ -180,16 +180,16 @@
                 <div class="greeting">
                     <div id="dash-user-avatar" class="dash-user-avatar">?</div>
                     <div class="greeting-text">
-                        <p class="greeting-sub" id="greeting-sub">Welcome back</p>
+                        <p class="greeting-sub">
+                            <span id="greeting-sub">Welcome back</span>
+                            <span id="user-role-badge" class="user-role-badge" style="display:none;"></span>
+                        </p>
                         <h2 class="greeting-name" id="user-name">Champ 👋</h2>
                     </div>
                 </div>
                 <div class="header-right">
-                    <div class="day-badge">
-                        <span id="current-day">1</span>/100
-                    </div>
                     <button class="icon-btn" onclick="refreshDashboard()" title="Refresh">🔄</button>
-                    <button class="dark-toggle-btn" id="dark-toggle" onclick="toggleDarkMode()" title="Toggle dark mode">🌙</button>
+                    <button class="icon-btn" id="dark-toggle" onclick="toggleDarkMode()" title="Toggle dark mode">🌙</button>
                     <button class="icon-btn" id="settings-btn" onclick="showSettings()">⚙️</button>
                 </div>
             </div>
