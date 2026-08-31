@@ -1059,7 +1059,51 @@
             <div class="wds-section">
                 <textarea id="wds-note" class="wds-note" placeholder="Add a quick note... (optional)" rows="2"></textarea>
             </div>
+            <!-- Checkin photo -->
+            <div class="wds-section wds-photo-row">
+                <div id="wds-photo-preview" class="wds-photo-preview" style="display:none;"></div>
+                <button class="wds-photo-btn" id="wds-photo-btn" onclick="triggerCheckinPhoto()">📸 Add Photo</button>
+                <input type="file" id="wds-photo-input" accept="image/*" style="display:none;" onchange="onCheckinPhotoChange(this)">
+            </div>
             <button class="btn-primary wds-save" onclick="saveWorkoutDetails()">Save Details</button>
+        </div>
+    </div>
+
+    <!-- Season 7 Setup Overlay (shown once to returning S6 users) -->
+    <div id="s7-setup-overlay" class="s7-setup-overlay" style="display:none;">
+        <div class="s7-setup-card">
+            <div class="s7-setup-icon">🎉</div>
+            <h2 class="s7-setup-title">Welcome to Season 7!</h2>
+            <p class="s7-setup-sub">Set your fresh goals for this season, <span id="s7-user-name"></span>.</p>
+
+            <div class="s7-field-group">
+                <label class="s7-label">🎯 Your Season 7 goal</label>
+                <input id="s7-goal" type="text" class="s7-input" placeholder="e.g. Lose 5kg, run a 5K, build muscle..." maxlength="120">
+            </div>
+            <div class="s7-field-group">
+                <label class="s7-label">💪 Daily commitment</label>
+                <input id="s7-commitment" type="text" class="s7-input" placeholder="e.g. 30 mins gym, 10k steps daily..." maxlength="80">
+            </div>
+            <div class="s7-field-group">
+                <label class="s7-label">📅 Weekly workout target</label>
+                <select id="s7-weekly" class="s7-input">
+                    <option value="">Skip for now</option>
+                    <option value="2">2 days/week</option>
+                    <option value="3">3 days/week</option>
+                    <option value="4">4 days/week</option>
+                    <option value="5">5 days/week</option>
+                    <option value="6">6 days/week</option>
+                    <option value="7">Every day</option>
+                </select>
+            </div>
+            <div class="s7-field-group">
+                <label class="s7-label">👥 Join a team (optional)</label>
+                <button class="s7-team-btn" id="s7-team-btn" onclick="openTeamPickerForSetup()">Browse teams or create one →</button>
+                <p class="s7-team-chosen" id="s7-team-chosen" style="display:none;"></p>
+            </div>
+
+            <button class="s7-go-btn" onclick="submitS7Setup()">Let's go! 🚀</button>
+            <button class="s7-skip-btn" onclick="skipS7Setup()">Skip for now</button>
         </div>
     </div>
 

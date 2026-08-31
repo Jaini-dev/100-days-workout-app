@@ -533,6 +533,7 @@ function _buildParticipant(row, checkinRows) {
         centuryClub: row.century_club || null,
         _profilePhotoPath: row.profile_photo_url || null,
         profilePhotoUrl: null, // resolved to signed URL in supabaseLogin
+        seasonSetup: row.season_setup || {},
         isAdmin: row.is_admin || false,
         isSuperAdmin: row.is_super_admin || false,
         joinDate: row.join_date || null,
@@ -637,6 +638,7 @@ async function supabaseSaveProfile(user) {
         checkin_details: user.checkinDetails || {},
         century_club: user.centuryClub || null,
         profile_photo_url: user._profilePhotoPath || null,
+        season_setup: user.seasonSetup || {},
         is_admin: user.isAdmin || false,
         is_super_admin: user.isSuperAdmin || false,
     }, { onConflict: 'phone' });
@@ -767,6 +769,121 @@ window.onPhotoFileChange = async function(input) {
     hideLoading();
     input.value = '';
 };
+
+// ============================================
+// SEASON 7 SETUP FLOW
+// ============================================
+let _s7TeamChosen = null;
+
+function showS7Setup() {
+    const overlay = $('s7-setup-overlay');
+    if (!overlay) return;
+    const user = appState.currentUser;
+    if (!user) return;
+    const nameEl = $('s7-user-name');
+    if (nameEl) nameEl.textContent = user.name.split(' ')[0];
+    // Pre-fill if they had old goal
+    const goalEl = $('s7-goal');
+    if (goalEl) goalEl.value = '';
+    const commitEl = $('s7-commitment');
+    if (commitEl) commitEl.value = '';
+    _s7TeamChosen = user.teamName || null;
+    _updateS7TeamDisplay();
+    overlay.style.display = 'flex';
+}
+
+function _updateS7TeamDisplay() {
+    const btn = $('s7-team-btn');
+    const chosen = $('s7-team-chosen');
+    if (!btn || !chosen) return;
+    if (_s7TeamChosen) {
+        btn.style.display = 'none';
+        chosen.style.display = 'block';
+        chosen.textContent = '✅ Team: ' + _s7TeamChosen;
+    } else {
+        btn.style.display = 'block';
+        chosen.style.display = 'none';
+    }
+}
+
+window.openTeamPickerForSetup = function() {
+    window._teamPickerCallback = (teamName) => {
+        _s7TeamChosen = teamName;
+        _updateS7TeamDisplay();
+    };
+    showTeamPicker();
+};
+
+window.submitS7Setup = async function() {
+    const goal = ($('s7-goal').value || '').trim();
+    const commitment = ($('s7-commitment').value || '').trim();
+    const weekly = $('s7-weekly').value;
+    if (!goal) { showToast('Please enter your Season 7 goal', 'error'); return; }
+    const user = appState.currentUser;
+    user.goal = goal;
+    user.commitment = commitment || user.commitment;
+    if (weekly) user.weeklyGoal = parseInt(weekly);
+    if (_s7TeamChosen) user.teamName = _s7TeamChosen;
+    user.seasonSetup = { ...( user.seasonSetup || {}), s7: true };
+    await supabaseSaveProfile(user);
+    saveData();
+    $('s7-setup-overlay').style.display = 'none';
+    updateDashboard();
+    showToast('Season 7 goals saved! Let\'s go 🚀', 'success');
+};
+
+window.skipS7Setup = function() {
+    const user = appState.currentUser;
+    user.seasonSetup = { ...(user.seasonSetup || {}), s7: true };
+    supabaseSaveProfile(user).catch(() => {});
+    saveData();
+    $('s7-setup-overlay').style.display = 'none';
+};
+
+// ============================================
+// CHECKIN PHOTO UPLOAD
+// ============================================
+let _checkinPhotoDate = null;
+
+window.triggerCheckinPhoto = function() { $('wds-photo-input')?.click(); };
+
+window.onCheckinPhotoChange = async function(input) {
+    const file = input.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { showToast('Images only please', 'error'); return; }
+    showLoading();
+    try {
+        const blob = await compressImage(file, CONFIG.MAX_PHOTO_BYTES);
+        const user = appState.currentUser;
+        const date = _checkinPhotoDate || getTodayString();
+        const sb = getSB();
+        const path = `${user.phone}/${date}.jpg`;
+        const { error } = await sb.storage.from('checkin-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+        if (error) { showToast('Photo upload failed', 'error'); hideLoading(); return; }
+        if (!user.checkinDetails) user.checkinDetails = {};
+        if (!user.checkinDetails[date]) user.checkinDetails[date] = {};
+        user.checkinDetails[date].photo = path;
+        // Show preview in sheet
+        const { data: sd } = await sb.storage.from('checkin-photos').createSignedUrl(path, 7 * 24 * 3600);
+        const preview = $('wds-photo-preview');
+        const btn = $('wds-photo-btn');
+        if (preview && sd?.signedUrl) {
+            preview.style.backgroundImage = `url('${sd.signedUrl}')`;
+            preview.style.display = 'block';
+        }
+        if (btn) { btn.textContent = '📸 Change Photo'; btn.classList.add('has-photo'); }
+        supabaseSaveProfile(user).catch(() => {});
+        saveData();
+        showToast('Photo added! 📸', 'success');
+    } catch (e) {
+        showToast(e.message || 'Upload failed', 'error');
+    }
+    hideLoading();
+    input.value = '';
+};
+
+// Call this when opening workout details sheet so photo handler knows the date
+function setCheckinPhotoDate(date) { _checkinPhotoDate = date || getTodayString(); }
 
 function loadData() {
     try {
@@ -1341,6 +1458,7 @@ async function handleLogin() {
         showTab('home');
         window.scrollTo(0, 0);
         subscribeRealtime();
+        if (!user.seasonSetup?.s7) setTimeout(showS7Setup, 800);
         const milestone = checkMilestone(user);
         if (milestone) {
             setTimeout(() => {
@@ -1482,6 +1600,9 @@ async function handleUserRegistration() {
         appState.isFirstTime = false;
         appState.isAdmin = appState.currentUser.isAdmin || false;
         appState.isSuperAdmin = appState.currentUser.isSuperAdmin || false;
+        // New registrations already have fresh goals — mark S7 done
+        appState.currentUser.seasonSetup = { s7: true };
+        supabaseSaveProfile(appState.currentUser).catch(() => {});
         saveData();
         hideLoading();
         showToast('Welcome to the challenge, ' + name.split(' ')[0] + '! 💪', 'success');
@@ -1893,6 +2014,22 @@ function showWorkoutDetailsSheet(dateStr) {
     if (addRow) addRow.style.display = 'none';
     const addField = $('wds-add-type-field');
     if (addField) addField.value = '';
+    // Reset checkin photo UI
+    setCheckinPhotoDate(dateStr);
+    const preview = $('wds-photo-preview');
+    const photoBtn = $('wds-photo-btn');
+    const existingPhoto = (appState.currentUser?.checkinDetails || {})[dateStr]?.photo;
+    if (preview) { preview.style.display = 'none'; preview.style.backgroundImage = ''; }
+    if (photoBtn) { photoBtn.textContent = '📸 Add Photo'; photoBtn.classList.remove('has-photo'); }
+    if (existingPhoto) {
+        getSB().storage.from('checkin-photos').createSignedUrl(existingPhoto, 7 * 24 * 3600).then(({ data }) => {
+            if (data?.signedUrl && preview) {
+                preview.style.backgroundImage = `url('${data.signedUrl}')`;
+                preview.style.display = 'block';
+                if (photoBtn) { photoBtn.textContent = '📸 Change Photo'; photoBtn.classList.add('has-photo'); }
+            }
+        });
+    }
     const sheet = $('workout-details-sheet');
     if (sheet) {
         sheet.style.display = 'flex';
@@ -2646,9 +2783,14 @@ function joinTeam(teamName) {
     const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
     if (idx >= 0) appState.participants[idx].teamName = teamName;
     saveData();
-    _updateTeamDisplay();
     hideTeamPicker();
-    showToast(`Joined "${teamName}" 👥`, 'success');
+    if (window._teamPickerCallback) {
+        window._teamPickerCallback(teamName);
+        window._teamPickerCallback = null;
+    } else {
+        _updateTeamDisplay();
+        showToast(`Joined "${teamName}" 👥`, 'success');
+    }
 }
 
 function leaveTeam() {
