@@ -2834,6 +2834,7 @@ function _htmlEsc(str) {
 function showTeamPicker() {
     const sheet = $('team-picker-sheet');
     if (!sheet) return;
+    document.body.classList.add('modal-open');
     sheet.style.display = 'flex';
     requestAnimationFrame(() => sheet.classList.add('tps-visible'));
     showTeamList();
@@ -2842,6 +2843,7 @@ function showTeamPicker() {
 function hideTeamPicker() {
     const sheet = $('team-picker-sheet');
     if (!sheet) return;
+    document.body.classList.remove('modal-open');
     sheet.classList.remove('tps-visible');
     setTimeout(() => { if (!sheet.classList.contains('tps-visible')) sheet.style.display = 'none'; }, 300);
 }
@@ -2892,7 +2894,7 @@ function showTeamList() {
     }
 
     html += `<button class="tps-create-btn" onclick="showCreateTeam()">＋ Create a new team</button>`;
-    if (myKey) html += `<button class="tps-leave-btn" onclick="leaveTeam()">Leave current team</button>`;
+    if (myKey) html += `<button class="tps-leave-btn" onclick="confirmLeaveTeam()">Leave current team</button>`;
     body.innerHTML = html;
 }
 
@@ -2942,7 +2944,7 @@ function showTeamDetail(teamName) {
 
     html += `</div>`;
     if (isMyTeam) {
-        html += `<button class="tps-leave-btn tps-leave-btn-full" onclick="leaveTeam()">Leave this team</button>`;
+        html += `<button class="tps-leave-btn tps-leave-btn-full" onclick="confirmLeaveTeam()">Leave this team</button>`;
     } else {
         html += `<button class="tps-join-btn" data-team="${_htmlEsc(teamName)}" onclick="joinTeam(this.dataset.team)">Join ${_htmlEsc(teamName)} 👥</button>`;
     }
@@ -2984,6 +2986,12 @@ function joinTeam(teamName) {
         _updateTeamDisplay();
         showToast(`Joined "${teamName}" 👥`, 'success');
     }
+}
+
+function confirmLeaveTeam() {
+    const teamName = appState.currentUser?.teamName || 'this team';
+    if (!confirm(`Leave "${teamName}"? You can rejoin or join a different team anytime.`)) return;
+    leaveTeam();
 }
 
 function leaveTeam() {
@@ -4830,12 +4838,20 @@ document.addEventListener('DOMContentLoaded', () => {
         supabaseLogin(appState.currentUser.phone).then(result => {
             if (result.success) {
                 const remote = result.data.user;
+                const prevTeamName = appState.currentUser?.teamName;
                 // Preserve local checkins that haven't synced yet
                 const merged = { ...(remote.checkins || {}), ...(appState.currentUser.checkins || {}) };
                 remote.checkins = merged;
+                // Preserve locally set teamName if DB doesn't have it yet (save race)
+                if (!remote.teamName && prevTeamName) remote.teamName = prevTeamName;
                 appState.currentUser = remote;
                 appState.participants = result.data.participants;
-                appState.participants.forEach(p => { if (p.phone === remote.phone) p.checkins = merged; });
+                appState.participants.forEach(p => {
+                    if (p.phone === remote.phone) {
+                        p.checkins = merged;
+                        if (!p.teamName && prevTeamName) p.teamName = prevTeamName;
+                    }
+                });
                 saveData();
                 updateDashboard();
             }
@@ -5048,6 +5064,7 @@ window.showCreateTeam = showCreateTeam;
 window.confirmCreateTeam = confirmCreateTeam;
 window.joinTeam = joinTeam;
 window.leaveTeam = leaveTeam;
+window.confirmLeaveTeam = confirmLeaveTeam;
 window.dismissWorkoutDetails = dismissWorkoutDetails;
 window.selectWdsChip = selectWdsChip;
 window.saveWorkoutDetails = saveWorkoutDetails;
