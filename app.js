@@ -4296,16 +4296,36 @@ function resetParticipantPassword(phone) {
     const participant = appState.participants.find(p => p.phone === phone);
     if (!participant) return;
 
-    const newPassword = prompt(`Enter new password for ${participant.name}:`);
-    if (!newPassword || newPassword.length < 4) {
-        showToast('Password must be at least 4 characters', 'error');
-        return;
-    }
+    if (!confirm(`Reset password for ${participant.name}?\n\nThis clears their password so they can log in with any new password they choose.`)) return;
 
-    participant.passwordHash = hashPassword(newPassword);
+    participant.passwordHash = null;
+    getSB().from('participants').update({ password_hash: null }).eq('phone', phone)
+        .then(({ error }) => {
+            if (error) showToast('Sync failed — try again', 'error');
+            else showToast(`Password cleared for ${participant.name}. They can now log in with any new password.`, 'success');
+        });
     saveData();
-    showToast(`Password reset for ${participant.name}`, 'success');
 }
+
+window.changePassword = async function() {
+    const user = appState.currentUser;
+    if (!user) return;
+    const currentPw = $('pw-current')?.value || '';
+    const newPw = $('pw-new')?.value || '';
+    if (!currentPw) { showToast('Enter your current password', 'error'); return; }
+    if (!newPw || newPw.length < 4) { showToast('New password must be at least 4 characters', 'error'); return; }
+    if (user.passwordHash && hashPassword(currentPw) !== user.passwordHash) {
+        showToast('Current password is wrong', 'error'); return;
+    }
+    const newHash = hashPassword(newPw);
+    const { error } = await getSB().from('participants').update({ password_hash: newHash }).eq('phone', user.phone);
+    if (error) { showToast('Update failed — try again', 'error'); return; }
+    user.passwordHash = newHash;
+    saveData();
+    if ($('pw-current')) $('pw-current').value = '';
+    if ($('pw-new')) $('pw-new').value = '';
+    showToast('Password updated!', 'success');
+};
 
 function removeParticipant(phone) {
     const participant = appState.participants.find(p => p.phone === phone);

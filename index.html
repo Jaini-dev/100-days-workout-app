@@ -80,6 +80,7 @@
                 </div>
 
                 <a href="#" id="admin-login-link" class="admin-link">🔐 Admin Login</a>
+                <p class="forgot-password-hint">Forgot password? Ask your admin to reset it for you.</p>
             </div>
 
             <div class="motivation-quote" id="login-quote">
@@ -627,6 +628,19 @@
                     <span>Total Participants</span>
                     <span id="info-participants">0</span>
                 </div>
+            </div>
+
+            <div class="settings-section">
+                <h3>Change Password</h3>
+                <div class="form-group">
+                    <label for="pw-current">Current password</label>
+                    <input type="password" id="pw-current" placeholder="Enter current password">
+                </div>
+                <div class="form-group">
+                    <label for="pw-new">New password</label>
+                    <input type="password" id="pw-new" placeholder="At least 4 characters">
+                </div>
+                <button class="btn-secondary" onclick="changePassword()">🔑 Update Password</button>
             </div>
 
             <div class="settings-section danger-zone">
