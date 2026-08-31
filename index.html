@@ -18,7 +18,7 @@
         <div class="splash-content">
             <div class="splash-icon">💪</div>
             <h1>100 Days of Workout</h1>
-            <p>Season 6</p>
+            <p>Season 7</p>
             <div class="splash-loader"></div>
         </div>
     </div>
@@ -27,19 +27,19 @@
     <div id="onboarding-screen" class="screen">
         <div class="container onboarding-container">
             <div class="onboarding-slide active" data-slide="1">
-                <div class="onboarding-icon">🎯</div>
-                <h2>Welcome to the Challenge!</h2>
-                <p>Join the 100 Days of Workout challenge. Track your daily workouts, compete with friends, and build an unbreakable streak!</p>
+                <div class="onboarding-icon">🌱</div>
+                <h2>Season 7 — Fresh Start</h2>
+                <p>100 days. One goal. Show up every day and build the strongest version of yourself yet. Sep 1 to Feb 28.</p>
             </div>
             <div class="onboarding-slide" data-slide="2">
-                <div class="onboarding-icon">✅</div>
-                <h2>Simple Daily Check-in</h2>
-                <p>Just tap YES or NO each day. That's it! No complicated logging, no excuses. Just show up.</p>
+                <div class="onboarding-icon">📸</div>
+                <h2>Log It Your Way</h2>
+                <p>Check in daily, track your workout type and mood, and snap a photo to remember the moment. Every rep counts.</p>
             </div>
             <div class="onboarding-slide" data-slide="3">
                 <div class="onboarding-icon">🏆</div>
-                <h2>Climb the Leaderboard</h2>
-                <p>See how you stack up against the group. Build your streak, earn your spot at the top!</p>
+                <h2>Stronger Together</h2>
+                <p>Join a team, rise on the leaderboard, and hold each other accountable. The group makes you go further than you would alone.</p>
             </div>
             <div class="onboarding-dots">
                 <span class="dot active" data-dot="1"></span>
@@ -57,7 +57,7 @@
             <div class="logo-section">
                 <div class="logo-icon">💪</div>
                 <h1>100 Days of Workout</h1>
-                <p class="tagline">Season 6</p>
+                <p class="tagline">Season 7</p>
             </div>
 
             <div class="login-form">
@@ -185,6 +185,7 @@
                         <span id="current-day">1</span>/100
                     </div>
                     <button class="icon-btn" onclick="refreshDashboard()" title="Refresh">🔄</button>
+                    <button class="dark-toggle-btn" id="dark-toggle" onclick="toggleDarkMode()" title="Toggle dark mode">🌙</button>
                     <button class="icon-btn" id="settings-btn" onclick="showSettings()">⚙️</button>
                 </div>
             </div>
@@ -224,7 +225,7 @@
             <div class="checkin-section" id="checkin-section">
                 <h3>Did you workout today?</h3>
                 <p class="date-display" id="today-date"></p>
-                <a href="#" class="update-past-link" onclick="showTab('calendar'); return false;">📅 Update past records</a>
+                <a href="#" id="update-past-link" class="update-past-link" style="display:none;" onclick="showTab('calendar'); return false;">📅 Update past records</a>
 
                 <div class="checkin-buttons-v2" id="checkin-buttons">
                     <button class="checkin-btn-v2 yes" id="btn-yes">

@@ -1065,6 +1065,28 @@ function exportToCSV() {
 }
 
 // ============================================
+// DARK MODE
+// ============================================
+function initDarkMode() {
+    const saved = localStorage.getItem('darkMode');
+    const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+    const isDark = saved === 'dark' || (saved === null && prefersDark);
+    applyDarkMode(isDark, false);
+}
+
+function applyDarkMode(dark, save = true) {
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    const btn = $('dark-toggle');
+    if (btn) btn.textContent = dark ? '☀️' : '🌙';
+    if (save) localStorage.setItem('darkMode', dark ? 'dark' : 'light');
+}
+
+window.toggleDarkMode = function() {
+    const current = document.documentElement.getAttribute('data-theme');
+    applyDarkMode(current !== 'dark');
+};
+
+// ============================================
 // UI FUNCTIONS
 // ============================================
 function showLoading() {
@@ -1798,6 +1820,14 @@ function updateDashboard() {
     const dateEl = $('today-date');
     if (dateEl) dateEl.textContent = formatDate(new Date());
 
+    // "Update past records" link — only show from Sep 2 onwards
+    const pastLink = $('update-past-link');
+    if (pastLink) {
+        const today = new Date(); today.setHours(0,0,0,0);
+        const showFrom = new Date('2026-09-02');
+        pastLink.style.display = today >= showFrom ? '' : 'none';
+    }
+
     // Daily motivation quote
     const motivationEl = $('motivation-text');
     if (motivationEl) {
@@ -2299,6 +2329,11 @@ async function submitCheckin(status, dateStr = null) {
 
     const targetDate = dateStr || getTodayString();
 
+    // Never allow checkins before season start
+    const tDate = new Date(targetDate); tDate.setHours(0,0,0,0);
+    const sStart = new Date(challengeSettings.startDate); sStart.setHours(0,0,0,0);
+    if (tDate < sStart) { showToast('Season 7 starts Sep 1 — no entries before that!', ''); return; }
+
     // Update local state first
     if (!appState.currentUser.checkins) {
         appState.currentUser.checkins = {};
@@ -2449,6 +2484,9 @@ function renderPastDaysSection() {
 }
 
 function logPastDay(dateStr, status) {
+    const d = new Date(dateStr); d.setHours(0,0,0,0);
+    const seasonStart = new Date(challengeSettings.startDate); seasonStart.setHours(0,0,0,0);
+    if (d < seasonStart) { showToast('Season 7 starts Sep 1 — no entries before that!', ''); return; }
     submitCheckin(status, dateStr);
 }
 
@@ -3418,9 +3456,10 @@ function renderCalendar() {
             const isToday = dateStr === getTodayString();
             const isFuture = date > today;
 
-            // Any past day (and today) can be edited; only future days are locked.
+            // Past/today days are editable, but never before the season start date.
             const daysDiff = Math.floor((today - date) / (1000 * 60 * 60 * 24));
-            const canEdit = daysDiff >= 0;
+            const seasonStart = new Date(challengeSettings.startDate); seasonStart.setHours(0,0,0,0);
+            const canEdit = daysDiff >= 0 && date >= seasonStart;
 
             let statusClass = '';
 
@@ -4498,6 +4537,7 @@ function saveSettings() {
 // INITIALIZATION
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
+    initDarkMode();
     loadData();
     cleanupDemoData();
     // If already logged in from localStorage cache, refresh from Supabase in background
