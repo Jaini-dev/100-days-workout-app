@@ -1866,7 +1866,12 @@ function calculateStreak(user) {
 function calculateTotalWorkouts(user) {
     // If no checkins available, use pre-computed value from API
     if (!user.checkins) return user.totalWorkouts || 0;
-    return Object.values(user.checkins).filter(v => v === 'Y').length;
+    // Only count workouts within the current challenge period
+    const start = challengeSettings.startDate;
+    const end = challengeSettings.endDate;
+    return Object.entries(user.checkins)
+        .filter(([date, v]) => v === 'Y' && date >= start && date <= end)
+        .length;
 }
 
 function calculateWeeklyWorkouts(user) {
@@ -2329,6 +2334,12 @@ function renderLeaderboard(category = 'thisWeek') {
 // ============================================
 // TEAM PICKER
 // ============================================
+let _tpsViewingTeam = null;
+
+function _htmlEsc(str) {
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function showTeamPicker() {
     const sheet = $('team-picker-sheet');
     if (!sheet) return;
@@ -2375,10 +2386,10 @@ function showTeamList() {
             const isMyTeam = myKey && team.name.toLowerCase() === myKey;
             const preview = team.members.map(m => m.name.split(' ')[0]).slice(0, 4).join(', ') + (team.members.length > 4 ? '…' : '');
             html += `
-                <div class="tps-team-card${isMyTeam ? ' tps-team-card-joined' : ''}" data-team="${team.name}" onclick="showTeamDetail(this.dataset.team)">
+                <div class="tps-team-card${isMyTeam ? ' tps-team-card-joined' : ''}" data-team="${_htmlEsc(team.name)}" onclick="showTeamDetail(this.dataset.team)">
                     <div class="tps-team-card-info">
-                        <div class="tps-team-card-name">${team.name}</div>
-                        <div class="tps-team-card-members">${team.members.length} member${team.members.length > 1 ? 's' : ''} · ${preview}</div>
+                        <div class="tps-team-card-name">${_htmlEsc(team.name)}</div>
+                        <div class="tps-team-card-members">${team.members.length} member${team.members.length > 1 ? 's' : ''} · ${_htmlEsc(preview)}</div>
                     </div>
                     <div class="tps-team-card-right">
                         ${isMyTeam ? '<span class="tps-badge-joined">Joined ✓</span>' : ''}
@@ -2395,6 +2406,7 @@ function showTeamList() {
 }
 
 function showTeamDetail(teamName) {
+    _tpsViewingTeam = teamName;
     _tpsSetHeader(true, teamName);
     const enriched = getSortedParticipants('all');
     const members = enriched.filter(p => (p.teamName || '').trim().toLowerCase() === teamName.toLowerCase());
@@ -2409,8 +2421,8 @@ function showTeamDetail(teamName) {
         const initial = (m.name || '?').charAt(0).toUpperCase();
         html += `
             <div class="tps-member-row${isMe ? ' tps-member-me' : ''}">
-                <div class="tps-member-avatar">${initial}</div>
-                <div class="tps-member-name">${m.name}${isMe ? ' <span class="tps-you-tag">(You)</span>' : ''}</div>
+                <div class="tps-member-avatar">${_htmlEsc(initial)}</div>
+                <div class="tps-member-name">${_htmlEsc(m.name)}${isMe ? ' <span class="tps-you-tag">(You)</span>' : ''}</div>
                 <div class="tps-member-stat">${m.totalWorkouts} days</div>
             </div>`;
     });
@@ -2419,7 +2431,7 @@ function showTeamDetail(teamName) {
     if (isMyTeam) {
         html += `<button class="tps-leave-btn tps-leave-btn-full" onclick="leaveTeam()">Leave this team</button>`;
     } else {
-        html += `<button class="tps-join-btn" onclick="joinTeam('${teamName.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')">Join ${teamName} 👥</button>`;
+        html += `<button class="tps-join-btn" data-team="${_htmlEsc(teamName)}" onclick="joinTeam(this.dataset.team)">Join ${_htmlEsc(teamName)} 👥</button>`;
     }
     body.innerHTML = html;
 }
