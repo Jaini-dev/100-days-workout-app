@@ -1,4 +1,4 @@
-const CACHE_NAME = '100-workout-v8';
+const CACHE_NAME = '100-workout-v9';
 const urlsToCache = [
   '/',
   '/index.html',

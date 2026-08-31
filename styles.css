@@ -1841,8 +1841,31 @@ body.modal-open .hamburger-btn { display: none; }
 }
 
 .cal-day.yes {
-    background: var(--success);
+    background: linear-gradient(135deg, #059669 0%, #047857 65%, #065f46 100%);
     color: white;
+    box-shadow: 0 3px 10px rgba(5,150,105,0.32), inset 0 1px 0 rgba(255,255,255,0.22);
+    position: relative;
+    overflow: hidden;
+    animation: calDayIn 0.3s ease-out both;
+}
+.cal-day.yes::after {
+    content: '';
+    position: absolute;
+    top: -60%;
+    left: -60%;
+    width: 220%;
+    height: 220%;
+    background: linear-gradient(45deg, transparent 35%, rgba(255,255,255,0.14) 50%, transparent 65%);
+    animation: calShimmer 3.5s linear infinite;
+    pointer-events: none;
+}
+@keyframes calShimmer {
+    0% { transform: translateX(-120%) translateY(-120%) rotate(0deg); }
+    100% { transform: translateX(120%) translateY(120%) rotate(0deg); }
+}
+@keyframes calDayIn {
+    from { opacity: 0; transform: scale(0.82); }
+    to   { opacity: 1; transform: scale(1); }
 }
 
 .cal-day.no {
@@ -2420,7 +2443,7 @@ body.modal-open .hamburger-btn { display: none; }
     bottom: 100px;
     left: 50%;
     transform: translateX(-50%) translateY(100px);
-    background: var(--gray-800);
+    background: #1f2937;
     color: white;
     padding: 12px 24px;
     border-radius: 12px;
@@ -6321,4 +6344,208 @@ body.modal-open {
     color: var(--gray-500);
     text-align: center;
     margin-top: 8px;
+}
+
+/* ============================================
+   PARTICIPANT ROW AVATAR & TEAM BADGE
+   ============================================ */
+.pr-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--gradient-1);
+    background-size: cover;
+    background-position: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 18px;
+    flex-shrink: 0;
+    margin-right: 8px;
+    border: 2px solid rgba(5,150,105,0.2);
+}
+.pr-team-badge {
+    display: inline-block;
+    background: rgba(5,150,105,0.1);
+    color: var(--primary);
+    padding: 2px 7px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 500;
+    margin-left: 4px;
+    vertical-align: middle;
+}
+[data-theme="dark"] .pr-team-badge {
+    background: rgba(52,211,153,0.15);
+}
+
+/* ============================================
+   DASHBOARD USER AVATAR IN GREETING
+   ============================================ */
+.greeting {
+    display: flex;
+    align-items: center;
+    gap: 0;
+}
+.dash-user-avatar {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    background: var(--gradient-1);
+    background-size: cover;
+    background-position: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 20px;
+    flex-shrink: 0;
+    margin-right: 12px;
+    box-shadow: 0 2px 10px rgba(5,150,105,0.3);
+    border: 2px solid rgba(255,255,255,0.6);
+}
+.greeting-text {
+    display: flex;
+    align-items: center;
+    gap: 0;
+}
+.greeting-text .wave {
+    margin-right: 4px;
+}
+
+/* ============================================
+   NO-TEAM NUDGE ON DASHBOARD
+   ============================================ */
+.no-team-nudge {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(5,150,105,0.07);
+    border: 1px solid rgba(5,150,105,0.18);
+    border-radius: 12px;
+    padding: 10px 14px;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    gap: 10px;
+}
+.no-team-nudge button {
+    background: none;
+    border: 1px solid var(--primary);
+    border-radius: 8px;
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 10px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* ============================================
+   S7 SETUP PHOTO FIELDS
+   ============================================ */
+.s7-photo-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 6px;
+}
+.s7-photo-preview {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background-size: cover;
+    background-position: center;
+    border: 3px solid var(--primary);
+    flex-shrink: 0;
+}
+.s7-photo-btn {
+    flex: 1;
+    background: var(--bg-subtle);
+    border: 1.5px dashed var(--primary);
+    border-radius: 12px;
+    padding: 12px 14px;
+    color: var(--primary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: center;
+    transition: background 0.2s;
+}
+.s7-photo-btn:active { background: rgba(5,150,105,0.15); }
+
+/* ============================================
+   PARTICIPANTS S7/S6 TABS
+   ============================================ */
+.participants-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+.participants-tab {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    border-radius: 12px;
+    background: var(--bg-subtle);
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.participants-tab.active {
+    background: var(--primary);
+    color: white;
+    box-shadow: 0 3px 10px rgba(5,150,105,0.3);
+}
+
+/* ============================================
+   STREAK CARD LUXURIOUS SHIMMER
+   ============================================ */
+.streak-card::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -60%;
+    width: 220%;
+    height: 220%;
+    background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.08) 50%, transparent 70%);
+    animation: streakShimmer 5s linear infinite;
+    pointer-events: none;
+}
+@keyframes streakShimmer {
+    0% { transform: translateX(-120%) rotate(0deg); }
+    100% { transform: translateX(120%) rotate(0deg); }
+}
+.streak-number {
+    text-shadow: 0 2px 20px rgba(0,0,0,0.25);
+}
+
+/* ============================================
+   DARK MODE MISC FIXES
+   ============================================ */
+[data-theme="dark"] .s7-setup-card {
+    background: var(--bg-card);
+    color: var(--text-primary);
+}
+[data-theme="dark"] .s7-input {
+    background: var(--bg-input);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .s7-setup-card {
+        background: var(--bg-card);
+        color: var(--text-primary);
+    }
+    :root:not([data-theme="light"]) .s7-input {
+        background: var(--bg-input);
+        color: var(--text-primary);
+        border-color: var(--border-color);
+    }
 }

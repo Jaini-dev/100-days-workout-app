@@ -178,8 +178,11 @@
             <!-- Header -->
             <div class="header">
                 <div class="greeting">
-                    <span class="wave">👋</span>
-                    <h2>Hey, <span id="user-name">Champ</span></h2>
+                    <div id="dash-user-avatar" class="dash-user-avatar">?</div>
+                    <div class="greeting-text">
+                        <span class="wave">👋</span>
+                        <h2>Hey, <span id="user-name">Champ</span></h2>
+                    </div>
                 </div>
                 <div class="header-right">
                     <div class="day-badge">
@@ -251,6 +254,12 @@
                         <button class="btn-text" id="change-checkin">Change response</button>
                         <button class="btn-text btn-undo" id="undo-checkin">Undo check-in</button>
                     </div>
+                </div>
+
+                <!-- No-team nudge -->
+                <div id="no-team-nudge" class="no-team-nudge" style="display:none;">
+                    <span>👥 Join a team to compete together!</span>
+                    <button onclick="showTeamPicker()">Join Team →</button>
                 </div>
             </div>
 
@@ -376,6 +385,11 @@
 
             <div class="participants-search">
                 <input type="text" id="participants-search-input" placeholder="Search by name..." oninput="filterParticipants()">
+            </div>
+
+            <div class="participants-tabs">
+                <button class="participants-tab active" id="tab-s7" onclick="switchParticipantsTab('s7', this)">Season 7</button>
+                <button class="participants-tab" id="tab-s6" onclick="switchParticipantsTab('s6', this)">Season 6 History</button>
             </div>
 
             <div id="participants-list-container">
@@ -1123,6 +1137,16 @@
                 <label class="s7-label">👥 Join a team (optional)</label>
                 <button class="s7-team-btn" id="s7-team-btn" onclick="openTeamPickerForSetup()">Browse teams or create one →</button>
                 <p class="s7-team-chosen" id="s7-team-chosen" style="display:none;"></p>
+            </div>
+            <div class="s7-field-group">
+                <label class="s7-label">📸 Profile photo (optional)</label>
+                <div class="s7-photo-row">
+                    <div id="s7-photo-preview" class="s7-photo-preview" style="display:none;"></div>
+                    <button class="s7-photo-btn" onclick="triggerS7Photo()">
+                        <span id="s7-photo-btn-text">📸 Add a profile photo</span>
+                    </button>
+                    <input type="file" id="s7-photo-input" accept="image/*" onchange="onS7PhotoChange(this)" style="display:none;">
+                </div>
             </div>
 
             <button class="s7-go-btn" onclick="submitS7Setup()">Let's go! 🚀</button>

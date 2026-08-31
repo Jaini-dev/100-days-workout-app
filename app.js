@@ -792,6 +792,19 @@ function showS7Setup() {
     if (commitEl) commitEl.value = '';
     _s7TeamChosen = user.teamName || null;
     _updateS7TeamDisplay();
+    // Show existing photo if any
+    const s7PhotoPreview = $('s7-photo-preview');
+    const s7PhotoBtn = $('s7-photo-btn-text');
+    if (s7PhotoPreview) {
+        if (user.profilePhotoUrl) {
+            s7PhotoPreview.style.backgroundImage = `url('${user.profilePhotoUrl}')`;
+            s7PhotoPreview.style.display = 'block';
+        } else {
+            s7PhotoPreview.style.backgroundImage = '';
+            s7PhotoPreview.style.display = 'none';
+        }
+    }
+    if (s7PhotoBtn) s7PhotoBtn.textContent = user.profilePhotoUrl ? '📸 Change photo' : '📸 Add a profile photo';
     overlay.style.display = 'flex';
 }
 
@@ -815,6 +828,27 @@ window.openTeamPickerForSetup = function() {
         _updateS7TeamDisplay();
     };
     showTeamPicker();
+};
+
+window.triggerS7Photo = function() { $('s7-photo-input')?.click(); };
+window.onS7PhotoChange = async function(input) {
+    const file = input.files?.[0];
+    if (!file) return;
+    const btn = $('s7-photo-btn-text');
+    if (btn) btn.textContent = '⏳ Uploading...';
+    try {
+        await uploadProfilePhoto(file);
+        const s7PhotoPreview = $('s7-photo-preview');
+        if (s7PhotoPreview && appState.currentUser?.profilePhotoUrl) {
+            s7PhotoPreview.style.backgroundImage = `url('${appState.currentUser.profilePhotoUrl}')`;
+            s7PhotoPreview.style.display = 'block';
+        }
+        if (btn) btn.textContent = '📸 Change photo';
+    } catch(e) {
+        if (btn) btn.textContent = '📸 Add a profile photo';
+        showToast('Photo upload failed', 'error');
+    }
+    input.value = '';
 };
 
 window.submitS7Setup = async function() {
@@ -1864,6 +1898,22 @@ function updateDashboard() {
     const dateEl = $('today-date');
     if (dateEl) dateEl.textContent = formatDate(new Date());
 
+    // User avatar in greeting
+    const dashAvatarEl = $('dash-user-avatar');
+    if (dashAvatarEl) {
+        const url = appState.currentUser?.profilePhotoUrl;
+        if (url) {
+            dashAvatarEl.style.backgroundImage = `url('${url}')`;
+            dashAvatarEl.textContent = '';
+        } else {
+            dashAvatarEl.style.backgroundImage = '';
+            dashAvatarEl.textContent = (appState.currentUser?.name || '?').charAt(0).toUpperCase();
+        }
+    }
+    // "Join a team" nudge on dashboard if no team
+    const noTeamNudge = $('no-team-nudge');
+    if (noTeamNudge) noTeamNudge.style.display = appState.currentUser?.teamName ? 'none' : '';
+
     // "Update past records" link - only show from Sep 2 onwards
     const pastLink = $('update-past-link');
     if (pastLink) {
@@ -2647,7 +2697,8 @@ function renderLeaderboard(category = 'thisWeek') {
         return;
     }
 
-    const sorted = getSortedParticipants(category);
+    // Only show S7-registered participants on leaderboard
+    const sorted = getSortedParticipants(category).filter(p => p.seasonSetup?.s7);
     const currentDay = getCurrentDay();
 
     // Category header
@@ -2891,6 +2942,7 @@ function joinTeam(teamName) {
     const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
     if (idx >= 0) appState.participants[idx].teamName = teamName;
     saveData();
+    supabaseSaveProfile(appState.currentUser).catch(() => {});
     hideTeamPicker();
     if (window._teamPickerCallback) {
         window._teamPickerCallback(teamName);
@@ -2908,6 +2960,7 @@ function leaveTeam() {
     const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
     if (idx >= 0) appState.participants[idx].teamName = null;
     saveData();
+    supabaseSaveProfile(appState.currentUser).catch(() => {});
     _updateTeamDisplay();
     hideTeamPicker();
     showToast(`Left team "${prev}"`, 'success');
@@ -3094,19 +3147,72 @@ function renderParticipantsScreen() {
     const sorted = getSortedParticipants('all');
     const todayDate = getTodayString();
 
-    // Count active today (use todayStatus from API when checkins not available)
-    const activeToday = sorted.filter(p => {
+    // Only S7-registered participants count for Season 7
+    const s7Sorted = sorted.filter(p => p.seasonSetup?.s7);
+
+    const activeToday = s7Sorted.filter(p => {
         const status = p.checkins ? p.checkins[todayDate] : p.todayStatus;
         return status === 'Y' || status === 'R';
     }).length;
 
-    if (totalEl) totalEl.textContent = sorted.length;
+    if (totalEl) totalEl.textContent = s7Sorted.length;
     if (activeEl) activeEl.textContent = activeToday;
 
-    // Store for filtering
-    window.allParticipantsData = sorted;
+    // Store for filtering (S7 only)
+    window.allParticipantsData = s7Sorted;
 
-    renderParticipantsList(sorted);
+    // Reset to S7 tab
+    const tabS7 = $('tab-s7');
+    const tabS6 = $('tab-s6');
+    if (tabS7) { tabS7.classList.add('active'); }
+    if (tabS6) { tabS6.classList.remove('active'); }
+
+    renderParticipantsList(s7Sorted);
+}
+
+window.switchParticipantsTab = function(tab, el) {
+    document.querySelectorAll('.participants-tab').forEach(b => b.classList.remove('active'));
+    if (el) el.classList.add('active');
+    if (tab === 's6') {
+        loadS6History();
+    } else {
+        const s7 = window.allParticipantsData || [];
+        renderParticipantsList(s7);
+    }
+};
+
+async function loadS6History() {
+    const container = $('participants-list-container');
+    if (container) container.innerHTML = '<p class="empty-message">Loading Season 6 data...</p>';
+    const sb = getSB();
+    const [{ data: s6Rows }, { data: s6Checkins }] = await Promise.all([
+        sb.from('participants').select('phone, name'),
+        sb.from('checkins').select('phone, status').gte('date', '2026-02-01').lte('date', '2026-07-31'),
+    ]);
+    const countByPhone = {};
+    (s6Checkins || []).forEach(c => {
+        if (c.status === 'Y') countByPhone[c.phone] = (countByPhone[c.phone] || 0) + 1;
+    });
+    const s6List = (s6Rows || [])
+        .map(r => ({ name: r.name, phone: r.phone, totalWorkouts: countByPhone[r.phone] || 0 }))
+        .filter(p => p.totalWorkouts > 0)
+        .sort((a, b) => b.totalWorkouts - a.totalWorkouts);
+    if (!container) return;
+    let html = '';
+    s6List.forEach((p, i) => {
+        const isMe = appState.currentUser?.phone === p.phone;
+        const rankClass = i === 0 ? 'top-1' : i === 1 ? 'top-2' : i === 2 ? 'top-3' : '';
+        html += `<div class="participant-row ${isMe ? 'is-me' : ''}">
+            <div class="rank-num ${rankClass}">${i + 1}</div>
+            <div class="pr-avatar">${(p.name || '?').charAt(0).toUpperCase()}</div>
+            <div class="participant-info">
+                <div class="participant-name">${p.name}${isMe ? ' (You)' : ''}</div>
+                <div class="participant-stats">Season 6 workouts</div>
+            </div>
+            <div class="participant-workouts">${p.totalWorkouts}</div>
+        </div>`;
+    });
+    container.innerHTML = html || '<p class="empty-message">No Season 6 data found</p>';
 }
 
 function renderParticipantsList(participants) {
@@ -3128,14 +3234,18 @@ function renderParticipantsList(participants) {
 
         const rankClass = rank === 1 ? 'top-1' : rank === 2 ? 'top-2' : rank === 3 ? 'top-3' : '';
 
+        const avatarStyle = p.profilePhotoUrl ? `background-image:url('${p.profilePhotoUrl}');` : '';
+        const avatarInitial = p.profilePhotoUrl ? '' : (p.name || '?').charAt(0).toUpperCase();
+        const teamBadge = p.teamName ? `<span class="pr-team-badge">👥 ${p.teamName}</span>` : '';
+        const showGoal = p.seasonSetup?.s7 && p.goal;
         html += `
             <div class="participant-row ${isMe ? 'is-me' : ''}" onclick="viewParticipantCalendar('${p.id || p.phone}')" style="cursor: pointer;">
                 <div class="rank-num ${rankClass}">${rank}</div>
+                <div class="pr-avatar" style="${avatarStyle}">${avatarInitial}</div>
                 <div class="participant-info">
                     <div class="participant-name">${p.name}${isMe ? ' (You)' : ''} ${todayIcon}</div>
-                    ${p.goal ? `<div class="participant-goal">🎯 ${p.goal}</div>` : ''}
-                    ${p.commitment ? `<div class="participant-commit">⏰ ${p.commitment}</div>` : ''}
-                    <div class="participant-stats">🔥 ${p.streak} streak · This week: ${p.weeklyWorkouts}</div>
+                    ${showGoal ? `<div class="participant-goal">🎯 ${p.goal}</div>` : ''}
+                    <div class="participant-stats">🔥 ${p.streak} streak · This week: ${p.weeklyWorkouts} ${teamBadge}</div>
                 </div>
                 <div class="participant-workouts">${p.totalWorkouts}</div>
             </div>
