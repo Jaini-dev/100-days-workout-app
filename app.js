@@ -1511,7 +1511,7 @@ async function handleLogin() {
             showToast('Incorrect password', 'error');
             return;
         }
-        // First login after password feature was added — save the password
+        // First login after password feature was added - save the password
         if (!user.passwordHash) {
             user.passwordHash = inputHash;
             getSB().from('participants').update({ password_hash: inputHash }).eq('phone', phone).then(() => {});
@@ -1669,7 +1669,7 @@ async function handleUserRegistration() {
         appState.isFirstTime = false;
         appState.isAdmin = appState.currentUser.isAdmin || false;
         appState.isSuperAdmin = appState.currentUser.isSuperAdmin || false;
-        // New registrations already have fresh goals — mark S7 done
+        // New registrations already have fresh goals - mark S7 done
         appState.currentUser.seasonSetup = { s7: true };
         supabaseSaveProfile(appState.currentUser).catch(() => {});
         saveData();
@@ -1841,7 +1841,7 @@ function updateDashboard() {
     const currentDay = getCurrentDay();
     const daysLeft = getDaysLeft();
 
-    // Calculate total workouts early (needed for badge and stats) — season-filtered
+    // Calculate total workouts early (needed for badge and stats) - season-filtered
     const totalWorkouts = calculateTotalWorkouts(user);
 
     // User name with admin badge
@@ -1864,7 +1864,7 @@ function updateDashboard() {
     const dateEl = $('today-date');
     if (dateEl) dateEl.textContent = formatDate(new Date());
 
-    // "Update past records" link — only show from Sep 2 onwards
+    // "Update past records" link - only show from Sep 2 onwards
     const pastLink = $('update-past-link');
     if (pastLink) {
         const today = new Date(); today.setHours(0,0,0,0);
@@ -2041,7 +2041,7 @@ function renderWeeklyGoal() {
 
     let msg;
     if (thisWeek === 0) msg = `🎯 Goal: ${goal} workouts this week`;
-    else if (over) msg = `🔥 ${thisWeek}/${goal} — weekly goal crushed!`;
+    else if (over) msg = `🔥 ${thisWeek}/${goal} - weekly goal crushed!`;
     else msg = `💪 ${thisWeek} of ${goal} this week`;
 
     container.style.display = 'block';
@@ -2376,7 +2376,7 @@ async function submitCheckin(status, dateStr = null) {
     // Never allow checkins before season start
     const tDate = new Date(targetDate); tDate.setHours(0,0,0,0);
     const sStart = new Date(challengeSettings.startDate); sStart.setHours(0,0,0,0);
-    if (tDate < sStart) { showToast('Season 7 starts Sep 1 — no entries before that!', ''); return; }
+    if (tDate < sStart) { showToast('Season 7 starts Sep 1 - no entries before that!', ''); return; }
 
     // Update local state first
     if (!appState.currentUser.checkins) {
@@ -2530,7 +2530,7 @@ function renderPastDaysSection() {
 function logPastDay(dateStr, status) {
     const d = new Date(dateStr); d.setHours(0,0,0,0);
     const seasonStart = new Date(challengeSettings.startDate); seasonStart.setHours(0,0,0,0);
-    if (d < seasonStart) { showToast('Season 7 starts Sep 1 — no entries before that!', ''); return; }
+    if (d < seasonStart) { showToast('Season 7 starts Sep 1 - no entries before that!', ''); return; }
     submitCheckin(status, dateStr);
 }
 
@@ -3537,7 +3537,7 @@ function renderCalendar() {
             const photoClass = hasPhoto ? ' has-photo' : '';
 
             html += `
-                <div class="cal-day ${statusClass}${photoClass} ${clickable}" ${onClick} ${photoAttr} title="Day ${i + 1} - ${formatShortDate(date)}${details?.type ? ' — ' + details.type : ''}">
+                <div class="cal-day ${statusClass}${photoClass} ${clickable}" ${onClick} ${photoAttr} title="Day ${i + 1} - ${formatShortDate(date)}${details?.type ? ' - ' + details.type : ''}">
                     <span class="cal-date">${date.getDate()}</span>
                     ${detailBadge}
                 </div>
@@ -4301,7 +4301,7 @@ function resetParticipantPassword(phone) {
     participant.passwordHash = null;
     getSB().from('participants').update({ password_hash: null }).eq('phone', phone)
         .then(({ error }) => {
-            if (error) showToast('Sync failed — try again', 'error');
+            if (error) showToast('Sync failed - try again', 'error');
             else showToast(`Password cleared for ${participant.name}. They can now log in with any new password.`, 'success');
         });
     saveData();
@@ -4319,7 +4319,7 @@ window.changePassword = async function() {
     }
     const newHash = hashPassword(newPw);
     const { error } = await getSB().from('participants').update({ password_hash: newHash }).eq('phone', user.phone);
-    if (error) { showToast('Update failed — try again', 'error'); return; }
+    if (error) { showToast('Update failed - try again', 'error'); return; }
     user.passwordHash = newHash;
     saveData();
     if ($('pw-current')) $('pw-current').value = '';
@@ -4854,7 +4854,7 @@ window.renderAdminDashboard = renderAdminDashboard;
 // Demo data removed - cloud sync only
 
 // ============================================
-// CENTURY CLUB — 100 days celebration
+// CENTURY CLUB - 100 days celebration
 // ============================================
 
 let _confettiFrame = null;
@@ -4866,7 +4866,7 @@ function checkCenturyClubUnlock() {
     const total = calculateTotalWorkouts(user);
     if (total < 100) return;
 
-    // Only pop once — if they already have the club data, skip
+    // Only pop once - if they already have the club data, skip
     if (user.centuryClub && user.centuryClub.unlockedAt) return;
 
     // Mark unlocked
@@ -5068,7 +5068,7 @@ function openCardBuilder() {
 
 function ccSetPhotoStatus(hasPhoto) {
     const el = $('cc-photo-status');
-    if (el) el.textContent = hasPhoto ? '✓ Photo added — tap to change' : 'Tap to choose a photo';
+    if (el) el.textContent = hasPhoto ? '✓ Photo added - tap to change' : 'Tap to choose a photo';
 }
 
 // Sync the little progress dots to the carousel scroll position
@@ -5119,7 +5119,7 @@ function handleCenturyPhoto(input) {
             }
             loadCardPhoto(_cardPhotoDataUrl, () => { refreshCardPreview(); persistCenturyCard(); ccSetPhotoStatus(true); });
         };
-        raw.onerror = () => showToast("Couldn't read that image — try another", 'error');
+        raw.onerror = () => showToast("Couldn't read that image - try another", 'error');
         raw.src = e.target.result;
     };
     reader.onerror = () => showToast("Couldn't read that file", 'error');
@@ -5145,7 +5145,7 @@ function onProudInput() {
 }
 
 // Quietly persist the card choices so the Hall of Fame stays in sync.
-// No toast, no navigation — Hall of Fame is automatic.
+// No toast, no navigation - Hall of Fame is automatic.
 function persistCenturyCard() {
     const user = appState.currentUser;
     if (!user) return;
@@ -5587,7 +5587,7 @@ function ccShareCaption() {
 }
 
 // Convert a dataURL to a Blob synchronously (so navigator.share keeps the
-// user-activation — async toBlob breaks the gesture on iOS and share silently fails).
+// user-activation - async toBlob breaks the gesture on iOS and share silently fails).
 function ccDataURLToBlob(dataUrl) {
     const [head, b64] = dataUrl.split(',');
     const mime = head.match(/:(.*?);/)[1];
@@ -5636,7 +5636,7 @@ function shareCenturyCard() {
     }
 
     const data = { files: [file], text: ccShareCaption() };
-    // Native file share (WhatsApp / Insta share sheet) — must stay in the gesture
+    // Native file share (WhatsApp / Insta share sheet) - must stay in the gesture
     if (navigator.share && (!navigator.canShare || navigator.canShare(data))) {
         navigator.share(data).catch(() => {}).finally(reset);
         return;
@@ -5646,7 +5646,7 @@ function shareCenturyCard() {
         navigator.share({ text: ccShareCaption() }).catch(() => {});
     }
     ccDownloadCanvas(canvas);
-    showToast('Image saved — share it on WhatsApp 📲', 'success');
+    showToast('Image saved - share it on WhatsApp 📲', 'success');
     reset();
 }
 
@@ -5683,7 +5683,7 @@ function renderHallOfFame() {
         container.innerHTML = `
             <div class="hof-empty">
                 <div class="hof-empty-icon">🏆</div>
-                <h3>No one yet — be the first!</h3>
+                <h3>No one yet - be the first!</h3>
                 <p>Complete 100 workouts to join the Century Club and have your card displayed here.</p>
             </div>`;
         return;

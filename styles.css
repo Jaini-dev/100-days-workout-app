@@ -9,7 +9,7 @@
 }
 
 :root {
-    /* Season 7 — Emerald */
+    /* Season 7 - Emerald */
     --primary: #059669;
     --primary-dark: #047857;
     --primary-light: #34d399;
@@ -5011,11 +5011,11 @@ body.modal-open .hamburger-btn { display: none; }
 }
 
 /* ============================================
-   CENTURY CLUB — Confetti, Celebration,
+   CENTURY CLUB - Confetti, Celebration,
    Card Builder, Hall of Fame
    ============================================ */
 
-/* Confetti canvas — shown/hidden via JS only */
+/* Confetti canvas - shown/hidden via JS only */
 .confetti-canvas {
     position: fixed;
     inset: 0;
@@ -5319,7 +5319,7 @@ body.modal-open .hamburger-btn { display: none; }
     gap: 0;
 }
 
-/* Card preview — full width, no side padding */
+/* Card preview - full width, no side padding */
 .cc-card-preview {
     border-radius: 0;
     margin: 0;
@@ -5349,7 +5349,7 @@ body.modal-open .hamburger-btn { display: none; }
     letter-spacing: 0.6px;
 }
 
-/* Photo upload — full width tap target */
+/* Photo upload - full width tap target */
 .cc-photo-upload-btn {
     display: flex;
     align-items: center;
@@ -5609,7 +5609,7 @@ body.modal-open .hamburger-btn { display: none; }
     color: #fff;
 }
 
-/* Card builder — full-height bottom sheet */
+/* Card builder - full-height bottom sheet */
 .cc-modal {
     align-items: flex-end !important;
     padding: 0 !important;
@@ -5656,7 +5656,7 @@ body.modal-open .hamburger-btn { display: none; }
 }
 
 /* ============================================
-   CENTURY CLUB — Canvas card + fun builder
+   CENTURY CLUB - Canvas card + fun builder
    ============================================ */
 .cc-canvas-wrap {
     padding: 16px 16px 6px;
@@ -5788,7 +5788,7 @@ body.modal-open .hamburger-btn { display: none; }
 }
 
 /* ============================================
-   CENTURY CLUB — scroll/layout fixes
+   CENTURY CLUB - scroll/layout fixes
    ============================================ */
 /* Lock the page behind any open modal (kills background scroll bleed) */
 body.modal-open {
@@ -5836,12 +5836,12 @@ body.modal-open {
 }
 
 /* ============================================
-   CENTURY CLUB — action button fix
+   CENTURY CLUB - action button fix
    ============================================ */
 /* Raise the builder above the floating menu button so taps always land */
 .cc-modal { z-index: 1500; }
 
-/* Stack the two actions full-width — big tap targets, no narrow zones */
+/* Stack the two actions full-width - big tap targets, no narrow zones */
 .cc-builder-actions {
     flex-direction: column;
     gap: 10px;
@@ -5862,7 +5862,7 @@ body.modal-open {
 .cc-download-btn2:active { transform: scale(0.98); background: var(--bg-page); }
 
 /* ============================================
-   CENTURY CLUB — give the form more room
+   CENTURY CLUB - give the form more room
    ============================================ */
 /* Smaller pinned preview */
 .cc-canvas-wrap { padding: 8px 14px 6px; }
@@ -5881,7 +5881,7 @@ body.modal-open {
 .cc-download-btn2 { width: 100%; padding: 12px; font-size: 14px; }
 
 /* ============================================
-   CENTURY CLUB — swipeable compact form + bigger card
+   CENTURY CLUB - swipeable compact form + bigger card
    ============================================ */
 /* Bigger pinned card now the form is a single compact row */
 .cc-card-canvas { max-height: 46vh; }
@@ -5996,7 +5996,7 @@ body.modal-open {
 .cc-share-btn { padding: 13px; font-size: 15px; }
 
 /* ============================================
-   CENTURY CLUB — dashboard "make your card" banner
+   CENTURY CLUB - dashboard "make your card" banner
    ============================================ */
 .century-banner {
     display: flex;
