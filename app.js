@@ -8,18 +8,30 @@
 // CONFIGURATION
 // ============================================
 const CONFIG = {
-    SEASON: 'Season 6',
+    SEASON: 'Season 7',
     STORAGE_KEY: 'workout100_data_v5',
-    VERSION: '5.0.0',
-    SUPER_ADMIN_CODE_HASH: '31a82b', // Hashed admin code - not stored in plaintext
+    VERSION: '6.0.0',
+    SUPER_ADMIN_CODE_HASH: '31a82b',
     MAX_PAST_DAYS: 7,
-    AUTO_BACKUP_INTERVAL: 24 * 60 * 60 * 1000, // 24 hours
+    AUTO_BACKUP_INTERVAL: 24 * 60 * 60 * 1000,
     REMINDER_SNOOZE_HOURS: 4,
-    TOP_RANKS_VISIBLE: 5, // Only show ranks for top 5
-    // Google Sheets API
-    API_URL: 'https://script.google.com/macros/s/AKfycbz7oWHMpsI_jHb7kjsjtCJGclLXlANndjDdYAzeE0PUcbp7yLenJDSfCMWoMiDehe9O/exec',
-    USE_CLOUD_SYNC: true // Enable cloud sync with Google Sheets
+    TOP_RANKS_VISIBLE: 5,
+    SUPABASE_URL: 'https://djyzaoisfslgkkfmgzuy.supabase.co',
+    SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqeXphb2lzZnNsZ2trZm1nenV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NjI0NjgsImV4cCI6MjA5MDQzODQ2OH0.YC5FQjZGn1a8wMaE8ykMlOHBURNACrZRiBDtXd-TLjw',
+    PHOTO_BUCKET: 'profile-photos',
+    MAX_PHOTO_BYTES: 200 * 1024,
 };
+
+// ============================================
+// SUPABASE CLIENT
+// ============================================
+let _sb = null;
+function getSB() {
+    if (!_sb) {
+        _sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+    }
+    return _sb;
+}
 
 // Challenge settings (can be modified by admin)
 let challengeSettings = {
@@ -489,9 +501,11 @@ function saveData() {
             lastSaved: new Date().toISOString()
         };
         localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(data));
-
-        // Check for auto-backup
         checkAutoBackup();
+        // Sync profile to Supabase in background (fire-and-forget)
+        if (appState.currentUser?.phone) {
+            supabaseSaveProfile(appState.currentUser).catch(() => {});
+        }
     } catch (e) {
         console.error('Failed to save data:', e);
         showToast('Warning: Could not save data!', 'error');
@@ -499,84 +513,231 @@ function saveData() {
 }
 
 // ============================================
-// CLOUD SYNC WITH GOOGLE SHEETS
+// SUPABASE DATA LAYER
 // ============================================
 
-async function apiCall(action, data = {}) {
-    if (!CONFIG.USE_CLOUD_SYNC || !CONFIG.API_URL) {
-        return { success: false, error: 'Cloud sync not configured' };
-    }
-
-    try {
-        const response = await fetch(CONFIG.API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'text/plain', // Required for Google Apps Script
-            },
-            body: JSON.stringify({ action, ...data })
-        });
-
-        const result = await response.json();
-        return result;
-    } catch (error) {
-        console.error('API call failed:', error);
-        return { success: false, error: error.message };
-    }
+// Build a participant object from a Supabase row + its checkins rows
+function _buildParticipant(row, checkinRows) {
+    const checkins = {};
+    (checkinRows || []).forEach(c => { checkins[c.date] = c.status; });
+    return {
+        phone: row.phone,
+        name: row.name,
+        goal: row.goal || '',
+        commitment: row.commitment || '',
+        timezone: row.timezone || 'Asia/Kolkata',
+        weeklyGoal: row.weekly_goal || null,
+        teamName: row.team_name || null,
+        customWorkoutTypes: row.custom_workout_types || [],
+        checkinDetails: row.checkin_details || {},
+        centuryClub: row.century_club || null,
+        profilePhotoUrl: row.profile_photo_url || null,
+        isAdmin: row.is_admin || false,
+        isSuperAdmin: row.is_super_admin || false,
+        joinDate: row.join_date || null,
+        checkins,
+    };
 }
 
-async function cloudRegister(userData) {
-    showLoading();
-    const result = await apiCall('register', {
-        name: userData.name,
+async function supabaseRegister(userData) {
+    const sb = getSB();
+    const { error } = await sb.from('participants').upsert({
         phone: userData.phone,
-        goal: userData.goal,
-        commitment: userData.commitment
+        name: userData.name,
+        goal: userData.goal || '',
+        commitment: userData.commitment || '',
+        timezone: userData.timezone || 'Asia/Kolkata',
+        join_date: getTodayString(),
+    }, { onConflict: 'phone', ignoreDuplicates: false });
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+}
+
+async function supabaseLogin(phone) {
+    const sb = getSB();
+    const seasonStart = challengeSettings.startDate;
+    const seasonEnd = challengeSettings.endDate;
+
+    // Fetch the user row
+    const { data: userRow, error: userErr } = await sb
+        .from('participants').select('*').eq('phone', phone).single();
+    if (userErr || !userRow) return { success: false, error: 'User not found' };
+
+    // Fetch ALL participants (for leaderboard)
+    const { data: allRows, error: allErr } = await sb.from('participants').select('*');
+    if (allErr) return { success: false, error: allErr.message };
+
+    // Fetch all checkins for this season
+    const { data: allCheckins, error: ciErr } = await sb
+        .from('checkins').select('*')
+        .gte('date', seasonStart).lte('date', seasonEnd);
+    if (ciErr) return { success: false, error: ciErr.message };
+
+    // Group checkins by phone
+    const checkinsByPhone = {};
+    (allCheckins || []).forEach(c => {
+        if (!checkinsByPhone[c.phone]) checkinsByPhone[c.phone] = [];
+        checkinsByPhone[c.phone].push(c);
     });
-    hideLoading();
 
-    if (result.success) {
-        showToast('Registered successfully!', 'success');
-    }
-    return result;
+    const participants = (allRows || []).map(r => _buildParticipant(r, checkinsByPhone[r.phone]));
+    const user = participants.find(p => p.phone === phone) || _buildParticipant(userRow, checkinsByPhone[phone]);
+
+    return { success: true, data: { user, participants } };
 }
 
-async function cloudLogin(phone) {
-    showLoading();
-    const result = await apiCall('login', { phone });
-    hideLoading();
-
-    if (result.success && result.data) {
-        // Update local state with cloud data
-        appState.participants = result.data.participants || [];
-        appState.currentUser = result.data.user;
-        saveData(); // Save to localStorage as backup
-    }
-    return result;
+async function supabaseCheckin(phone, date, status) {
+    const sb = getSB();
+    const { error } = await sb.from('checkins').upsert(
+        { phone, date, status },
+        { onConflict: 'phone,date' }
+    );
+    return error ? { success: false, error: error.message } : { success: true };
 }
 
-async function cloudCheckin(phone, date, status) {
-    // NOTE: We intentionally do NOT re-fetch the full profile from the cloud here.
-    // submitCheckin() has already updated local state optimistically. When a user
-    // logs several days in quick succession, multiple checkin requests are in
-    // flight at once. A full re-fetch (cloudLogin) that returns before the other
-    // writes have been persisted would overwrite local state with stale data and
-    // wipe out the days the user just tapped. The write below is enough to persist
-    // this single day; a manual refresh pulls everything else back down.
-    return await apiCall('checkin', { phone, date, status });
+async function supabaseSaveProfile(user) {
+    const sb = getSB();
+    const { error } = await sb.from('participants').upsert({
+        phone: user.phone,
+        name: user.name,
+        goal: user.goal || '',
+        commitment: user.commitment || '',
+        timezone: user.timezone || 'Asia/Kolkata',
+        weekly_goal: user.weeklyGoal || null,
+        team_name: user.teamName || null,
+        custom_workout_types: user.customWorkoutTypes || [],
+        checkin_details: user.checkinDetails || {},
+        century_club: user.centuryClub || null,
+        profile_photo_url: user.profilePhotoUrl || null,
+        is_admin: user.isAdmin || false,
+        is_super_admin: user.isSuperAdmin || false,
+    }, { onConflict: 'phone' });
+    return error ? { success: false, error: error.message } : { success: true };
 }
 
 async function refreshFromCloud() {
-    if (!appState.currentUser || !appState.currentUser.phone) {
-        return { success: false, error: 'Not logged in' };
-    }
-
-    const result = await cloudLogin(appState.currentUser.phone);
+    if (!appState.currentUser?.phone) return { success: false };
+    const result = await supabaseLogin(appState.currentUser.phone);
     if (result.success) {
+        // Merge: keep local checkins that aren't in Supabase yet
+        const localCheckins = appState.currentUser.checkins || {};
+        const remoteUser = result.data.user;
+        const merged = { ...localCheckins };
+        Object.entries(remoteUser.checkins || {}).forEach(([d, s]) => { merged[d] = s; });
+        remoteUser.checkins = merged;
+        appState.currentUser = remoteUser;
+        appState.participants = result.data.participants;
+        appState.participants.forEach(p => {
+            if (p.phone === remoteUser.phone) p.checkins = merged;
+        });
+        saveData();
         showToast('Data refreshed!', 'success');
         updateDashboard();
     }
     return result;
 }
+
+// Subscribe to real-time checkin updates
+function subscribeRealtime() {
+    const sb = getSB();
+    sb.channel('checkins-live')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'checkins' }, payload => {
+            const c = payload.new || payload.old;
+            if (!c) return;
+            const p = appState.participants.find(x => x.phone === c.phone);
+            if (p) {
+                if (!p.checkins) p.checkins = {};
+                if (payload.eventType !== 'DELETE') p.checkins[c.date] = c.status;
+                else delete p.checkins[c.date];
+            }
+            if (appState.currentTab === 'leaderboard') renderLeaderboard(appState.leaderboardCategory || 'thisWeek');
+        })
+        .subscribe();
+}
+
+// ============================================
+// IMAGE COMPRESSION + PROFILE PHOTO UPLOAD
+// ============================================
+
+async function compressImage(file, maxBytes) {
+    return new Promise((resolve, reject) => {
+        if (!file.type.startsWith('image/')) { reject(new Error('Only images allowed')); return; }
+        const reader = new FileReader();
+        reader.onload = e => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX_DIM = 400;
+                let w = img.width, h = img.height;
+                if (w > h && w > MAX_DIM) { h = Math.round(h * MAX_DIM / w); w = MAX_DIM; }
+                else if (h > MAX_DIM) { w = Math.round(w * MAX_DIM / h); h = MAX_DIM; }
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                let quality = 0.85;
+                const tryCompress = () => {
+                    canvas.toBlob(blob => {
+                        if (!blob) { reject(new Error('Compression failed')); return; }
+                        if (blob.size <= maxBytes || quality < 0.2) { resolve(blob); return; }
+                        quality -= 0.1;
+                        tryCompress();
+                    }, 'image/jpeg', quality);
+                };
+                tryCompress();
+            };
+            img.onerror = () => reject(new Error('Invalid image'));
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+async function uploadProfilePhoto(file) {
+    if (!appState.currentUser) return;
+    try {
+        const blob = await compressImage(file, CONFIG.MAX_PHOTO_BYTES);
+        const sb = getSB();
+        const path = `${appState.currentUser.phone}/avatar.jpg`;
+        const { error: upErr } = await sb.storage.from(CONFIG.PHOTO_BUCKET)
+            .upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+        if (upErr) { showToast('Photo upload failed', 'error'); return; }
+        const { data: urlData } = sb.storage.from(CONFIG.PHOTO_BUCKET).getPublicUrl(path);
+        const url = urlData.publicUrl + '?t=' + Date.now();
+        appState.currentUser.profilePhotoUrl = url;
+        const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
+        if (idx >= 0) appState.participants[idx].profilePhotoUrl = url;
+        await supabaseSaveProfile(appState.currentUser);
+        saveData();
+        renderProfilePhotoUI();
+        showToast('Profile photo updated! 📸', 'success');
+    } catch (err) {
+        showToast(err.message || 'Upload failed', 'error');
+    }
+}
+
+function renderProfilePhotoUI() {
+    const avatar = $('settings-avatar');
+    const url = appState.currentUser?.profilePhotoUrl;
+    if (avatar) {
+        if (url) {
+            avatar.style.backgroundImage = `url('${url}')`;
+            avatar.textContent = '';
+        } else {
+            avatar.style.backgroundImage = '';
+            avatar.textContent = (appState.currentUser?.name || '?').charAt(0).toUpperCase();
+        }
+    }
+}
+
+window.triggerPhotoUpload = function() { $('photo-file-input')?.click(); };
+window.onPhotoFileChange = async function(input) {
+    const file = input.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { showToast('Please select an image file', 'error'); return; }
+    showLoading();
+    await uploadProfilePhoto(file);
+    hideLoading();
+    input.value = '';
+};
 
 function loadData() {
     try {
@@ -857,6 +1018,7 @@ function showSettings() {
         }
     }
     _updateTeamDisplay();
+    renderProfilePhotoUI();
     $('info-participants').textContent = appState.participants.length;
     const infoSeasonEl = $('info-season');
     if (infoSeasonEl) infoSeasonEl.textContent = challengeSettings.seasonName;
@@ -1136,48 +1298,39 @@ async function handleLogin() {
 
     showLoading();
 
-    // Try cloud login first
-    if (CONFIG.USE_CLOUD_SYNC) {
-        const cloudResult = await cloudLogin(phone);
-
-        if (cloudResult.success && cloudResult.data) {
-            const user = cloudResult.data.user;
-            appState.currentUser = user;
-            appState.participants = cloudResult.data.participants || [];
-            appState.isAdmin = user.isAdmin || false;
-            appState.isSuperAdmin = user.isSuperAdmin || false;
-            appState.isFirstTime = false;
-            saveData();
-
-            hideLoading();
-            showToast('Welcome back, ' + user.name.split(' ')[0] + '!', 'success');
-            showTab('home');
-            window.scrollTo(0, 0);
-
-            // Check for milestones
-            const milestone = checkMilestone(user);
-            if (milestone) {
-                setTimeout(() => {
-                    const msg = getRandomQuote('milestone').replace('{count}', milestone);
-                    showToast(msg, 'success');
-                }, 2000);
-            }
-            setTimeout(checkForReminders, 3000);
-            return;
-        } else if (cloudResult.error && cloudResult.error.includes('not found')) {
-            // New user - go to registration
-            hideLoading();
-            showScreen('register-screen');
-            $('register-phone').value = phone;
-            $('register-password').value = password;
-            showToast('New user! Please complete registration.', '');
-            return;
-        }
-        // If cloud fails, fall back to local
+    const result = await supabaseLogin(phone);
+    if (result.success) {
+        const user = result.data.user;
+        appState.currentUser = user;
+        appState.participants = result.data.participants;
+        appState.isAdmin = user.isAdmin || false;
+        appState.isSuperAdmin = user.isSuperAdmin || false;
+        appState.isFirstTime = false;
+        saveData();
         hideLoading();
-        showToast('Could not connect. Try again.', 'error');
+        showToast('Welcome back, ' + user.name.split(' ')[0] + '!', 'success');
+        showTab('home');
+        window.scrollTo(0, 0);
+        subscribeRealtime();
+        const milestone = checkMilestone(user);
+        if (milestone) {
+            setTimeout(() => {
+                const msg = getRandomQuote('milestone').replace('{count}', milestone);
+                showToast(msg, 'success');
+            }, 2000);
+        }
+        setTimeout(checkForReminders, 3000);
+        return;
+    } else if (result.error === 'User not found') {
+        hideLoading();
+        showScreen('register-screen');
+        $('register-phone').value = phone;
+        $('register-password').value = password;
+        showToast('New user! Please complete registration.', '');
         return;
     }
+    hideLoading();
+    showToast('Could not connect. Check your connection and try again.', 'error');
 
     // Fallback to local login (if cloud sync disabled)
     const user = appState.participants.find(p => p.phone === phone);
@@ -1286,36 +1439,27 @@ async function handleUserRegistration() {
 
     showLoading();
 
-    // Register with cloud first
-    if (CONFIG.USE_CLOUD_SYNC) {
-        const cloudResult = await cloudRegister({
-            name: name,
-            phone: phone,
-            goal: goal,
-            commitment: commitment
-        });
+    const regResult = await supabaseRegister({ name, phone, goal, commitment });
+    if (!regResult.success) {
+        hideLoading();
+        showToast(regResult.error || 'Registration failed', 'error');
+        return;
+    }
 
-        if (cloudResult.success && cloudResult.data) {
-            // Now login to get all participants
-            const loginResult = await cloudLogin(phone);
-
-            if (loginResult.success) {
-                appState.currentUser = loginResult.data.user;
-                appState.participants = loginResult.data.participants || [];
-                appState.isFirstTime = false;
-                saveData();
-
-                hideLoading();
-                showToast('Welcome to the challenge, ' + name.split(' ')[0] + '! 💪', 'success');
-                showTab('home');
-                window.scrollTo(0, 0);
-                return;
-            }
-        } else if (cloudResult.error) {
-            hideLoading();
-            showToast(cloudResult.error, 'error');
-            return;
-        }
+    const loginResult = await supabaseLogin(phone);
+    if (loginResult.success) {
+        appState.currentUser = loginResult.data.user;
+        appState.participants = loginResult.data.participants;
+        appState.isFirstTime = false;
+        appState.isAdmin = appState.currentUser.isAdmin || false;
+        appState.isSuperAdmin = appState.currentUser.isSuperAdmin || false;
+        saveData();
+        hideLoading();
+        showToast('Welcome to the challenge, ' + name.split(' ')[0] + '! 💪', 'success');
+        showTab('home');
+        window.scrollTo(0, 0);
+        subscribeRealtime();
+        return;
     }
 
     // Fallback to local registration
@@ -1957,14 +2101,10 @@ async function submitCheckin(status, dateStr = null) {
 
     saveData();
 
-    // Sync to cloud
-    if (CONFIG.USE_CLOUD_SYNC) {
-        cloudCheckin(appState.currentUser.phone, targetDate, status).then(result => {
-            if (!result.success) {
-                console.error('Cloud sync failed:', result.error);
-            }
-        });
-    }
+    // Sync checkin to Supabase
+    supabaseCheckin(appState.currentUser.phone, targetDate, status).catch(e => {
+        console.error('Checkin sync failed:', e);
+    });
 
     if (!dateStr) {
         showCelebration(status);
@@ -2008,28 +2148,10 @@ async function undoCheckin() {
     // Remove from local state
     delete appState.currentUser.checkins[today];
 
-    // Sync with cloud - delete from Google Sheets
-    if (CONFIG.USE_CLOUD_SYNC) {
-        try {
-            const response = await fetch(CONFIG.API_URL, {
-                method: 'POST',
-                mode: 'cors',
-                headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify({
-                    action: 'deleteCheckin',
-                    phone: appState.currentUser.phone,
-                    date: today
-                })
-            });
-            const result = await response.json();
-            console.log('Delete checkin result:', result);
-            if (!result.success) {
-                console.error('Failed to delete from cloud:', result.error);
-            }
-        } catch (error) {
-            console.error('Cloud sync failed for undo:', error);
-        }
-    }
+    // Delete today's checkin from Supabase
+    getSB().from('checkins').delete()
+        .eq('phone', appState.currentUser.phone).eq('date', today)
+        .then(({ error }) => { if (error) console.error('Delete checkin failed:', error); });
 
     // Save locally
     saveData();
@@ -2308,7 +2430,7 @@ function renderLeaderboard(category = 'thisWeek') {
             html += `
                 <tr class="${isMe ? 'lb-row-me' : ''}">
                     <td class="lb-td-rank">${rankDisplay}</td>
-                    <td class="lb-td-name">${p.name}${isMe ? ' (You)' : ''}</td>
+                    <td class="lb-td-name">${_avatarHtml(p)}${p.name}${isMe ? ' (You)' : ''}</td>
                     <td class="lb-td-stat lb-td-primary">${primaryValue}</td>
                     <td class="lb-td-stat">${p.totalWorkouts}</td>
                     <td class="lb-td-stat">${rate}%</td>
@@ -2335,6 +2457,15 @@ function renderLeaderboard(category = 'thisWeek') {
 // TEAM PICKER
 // ============================================
 let _tpsViewingTeam = null;
+
+function _avatarHtml(p, size) {
+    const s = size || 32;
+    const initial = _htmlEsc((p.name || '?').charAt(0).toUpperCase());
+    if (p.profilePhotoUrl) {
+        return `<span class="lb-avatar" style="width:${s}px;height:${s}px;background-image:url('${p.profilePhotoUrl}');"></span>`;
+    }
+    return `<span class="lb-avatar" style="width:${s}px;height:${s}px;">${initial}</span>`;
+}
 
 function _htmlEsc(str) {
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -2418,10 +2549,9 @@ function showTeamDetail(teamName) {
     let html = `<div class="tps-member-list">`;
     members.sort((a, b) => b.totalWorkouts - a.totalWorkouts).forEach(m => {
         const isMe = isCurrentUser(m);
-        const initial = (m.name || '?').charAt(0).toUpperCase();
         html += `
             <div class="tps-member-row${isMe ? ' tps-member-me' : ''}">
-                <div class="tps-member-avatar">${_htmlEsc(initial)}</div>
+                <div class="tps-member-avatar" style="${m.profilePhotoUrl ? `background-image:url('${m.profilePhotoUrl}');` : ''}">${m.profilePhotoUrl ? '' : _htmlEsc((m.name || '?').charAt(0).toUpperCase())}</div>
                 <div class="tps-member-name">${_htmlEsc(m.name)}${isMe ? ' <span class="tps-you-tag">(You)</span>' : ''}</div>
                 <div class="tps-member-stat">${m.totalWorkouts} days</div>
             </div>`;
@@ -2764,19 +2894,18 @@ async function viewParticipantCalendar(identifier) {
     // Load checkins on-demand if not available (API no longer sends checkins for other users)
     const isMe = isCurrentUser(participant);
 
-    if (!participant.checkins && !isMe && CONFIG.USE_CLOUD_SYNC) {
+    // Load checkins on-demand from Supabase if not available
+    if (!participant.checkins && !isMe) {
         try {
-            const result = await apiCall('getParticipantCheckins', {
-                phone: appState.currentUser.phone,
-                targetId: participant.id || '',
-                targetPhone: participant.phone || ''
-            });
-            if (result.success && result.data) {
-                participant.checkins = result.data.checkins;
+            const { data } = await getSB().from('checkins').select('date,status')
+                .eq('phone', participant.phone)
+                .gte('date', challengeSettings.startDate)
+                .lte('date', challengeSettings.endDate);
+            if (data) {
+                participant.checkins = {};
+                data.forEach(c => { participant.checkins[c.date] = c.status; });
             }
-        } catch (e) {
-            console.log('Failed to load participant checkins:', e);
-        }
+        } catch (e) { console.log('Failed to load participant checkins:', e); }
     }
 
     // Calculate stats
@@ -3216,28 +3345,9 @@ async function quickLogDelete() {
         delete appState.currentUser.checkins[dateStr];
     }
 
-    // Sync with cloud
-    if (CONFIG.USE_CLOUD_SYNC) {
-        try {
-            const response = await fetch(CONFIG.API_URL, {
-                method: 'POST',
-                mode: 'cors',
-                headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify({
-                    action: 'deleteCheckin',
-                    phone: appState.currentUser.phone,
-                    date: dateStr
-                })
-            });
-            const result = await response.json();
-            console.log('Delete checkin result:', result);
-            if (!result.success) {
-                console.error('Failed to delete from cloud:', result.error);
-            }
-        } catch (error) {
-            console.error('Cloud sync failed for delete:', error);
-        }
-    }
+    getSB().from('checkins').delete()
+        .eq('phone', appState.currentUser.phone).eq('date', dateStr)
+        .then(({ error }) => { if (error) console.error('Delete checkin failed:', error); });
 
     saveData();
     renderCalendar();
@@ -4139,7 +4249,24 @@ function saveSettings() {
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
     loadData();
-    cleanupDemoData(); // Clean up any old demo/test data
+    cleanupDemoData();
+    // If already logged in from localStorage cache, refresh from Supabase in background
+    if (appState.currentUser?.phone) {
+        subscribeRealtime();
+        supabaseLogin(appState.currentUser.phone).then(result => {
+            if (result.success) {
+                const remote = result.data.user;
+                // Preserve local checkins that haven't synced yet
+                const merged = { ...(remote.checkins || {}), ...(appState.currentUser.checkins || {}) };
+                remote.checkins = merged;
+                appState.currentUser = remote;
+                appState.participants = result.data.participants;
+                appState.participants.forEach(p => { if (p.phone === remote.phone) p.checkins = merged; });
+                saveData();
+                updateDashboard();
+            }
+        }).catch(() => {});
+    }
 
     initOnboarding();
     initLogin();

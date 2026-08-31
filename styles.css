@@ -4176,6 +4176,66 @@ body.modal-open .hamburger-btn { display: none; }
 }
 .tps-new-team-input:focus { border-color: var(--primary, #6c63ff); }
 
+/* Profile photo in settings */
+.settings-photo-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 0 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+}
+.settings-avatar {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: var(--primary, #6c63ff);
+    background-size: cover;
+    background-position: center;
+    color: white;
+    font-size: 28px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    border: 3px solid var(--border);
+}
+.settings-photo-info { flex: 1; }
+.settings-photo-label { font-size: 13px; color: var(--text-secondary); margin: 0 0 6px; }
+.settings-photo-btn {
+    background: none;
+    border: 1.5px solid var(--primary, #6c63ff);
+    color: var(--primary, #6c63ff);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+}
+.settings-photo-btn:active { opacity: 0.8; }
+
+/* Profile photo avatars in leaderboard */
+.lb-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--primary, #6c63ff);
+    background-size: cover;
+    background-position: center;
+    color: white;
+    font-size: 13px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    vertical-align: middle;
+    margin-right: 6px;
+}
+
 /* Settings hint text */
 .settings-hint {
     font-size: 12px;

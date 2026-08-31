@@ -539,6 +539,15 @@
                     <span id="admin-badge" class="admin-badge" style="display:none;">Admin</span>
                     <span id="super-admin-badge" class="super-admin-badge" style="display:none;">👑 Super Admin</span>
                 </h3>
+                <div class="settings-photo-row">
+                    <div class="settings-avatar" id="settings-avatar" onclick="triggerPhotoUpload()"></div>
+                    <div class="settings-photo-info">
+                        <p class="settings-photo-label">Profile Photo</p>
+                        <button class="settings-photo-btn" onclick="triggerPhotoUpload()">Upload Photo</button>
+                        <p class="settings-hint">Images only · Max 200KB after compression</p>
+                    </div>
+                    <input type="file" id="photo-file-input" accept="image/*" style="display:none;" onchange="onPhotoFileChange(this)">
+                </div>
                 <div class="settings-item">
                     <label>Name</label>
                     <input type="text" id="settings-name" class="settings-input">
@@ -1060,6 +1069,7 @@
     <!-- Toast Notification -->
     <div id="toast" class="toast"></div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
