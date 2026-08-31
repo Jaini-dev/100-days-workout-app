@@ -547,6 +547,14 @@ body {
     opacity: 0.8;
 }
 
+.streak-secondary {
+    font-size: 15px;
+    font-weight: 600;
+    opacity: 0.88;
+    margin: 6px 0 4px;
+    letter-spacing: 0.3px;
+}
+
 /* ============================================
    CHECK-IN SECTION
    ============================================ */
@@ -821,6 +829,200 @@ body {
 }
 
 /* ============================================
+   WEEKLY GOAL STRIP
+   ============================================ */
+.weekly-goal-strip {
+    margin-bottom: 14px;
+}
+
+.weekly-goal-inner {
+    background: white;
+    border-radius: 14px;
+    padding: 12px 16px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.weekly-goal-inner.goal-done {
+    background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+}
+
+.weekly-goal-text {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--gray-700);
+    flex: 1;
+}
+
+.weekly-goal-dots {
+    display: flex;
+    gap: 5px;
+    flex-shrink: 0;
+}
+
+.week-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--gray-200);
+    display: inline-block;
+}
+
+.week-dot.done {
+    background: var(--primary);
+}
+
+/* ============================================
+   CALENDAR WORKOUT DETAIL BADGE
+   ============================================ */
+.cal-detail-icon {
+    font-size: 9px;
+    line-height: 1;
+    display: block;
+    text-align: center;
+    margin-top: 1px;
+}
+
+/* ============================================
+   WORKOUT DETAILS BOTTOM SHEET
+   ============================================ */
+.workout-details-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+}
+
+.wds-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.workout-details-sheet.wds-visible .wds-backdrop {
+    opacity: 1;
+}
+
+.wds-content {
+    position: relative;
+    background: white;
+    border-radius: 24px 24px 0 0;
+    padding: 24px 20px 32px;
+    width: 100%;
+    max-width: 480px;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 1;
+    max-height: 92vh;
+    overflow-y: auto;
+}
+
+.workout-details-sheet.wds-visible .wds-content {
+    transform: translateY(0);
+}
+
+.wds-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.wds-header h3 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin: 0 0 2px;
+}
+
+.wds-sub {
+    font-size: 13px;
+    color: var(--gray-500);
+    margin: 0;
+}
+
+.wds-skip {
+    background: none;
+    border: none;
+    color: var(--gray-400);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+.wds-skip:active { background: var(--gray-100); }
+
+.wds-section {
+    margin-bottom: 18px;
+}
+
+.wds-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-600);
+    margin: 0 0 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.wds-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.wds-chip {
+    background: var(--gray-100);
+    border: 2px solid transparent;
+    border-radius: 20px;
+    padding: 7px 14px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--gray-700);
+    transition: all 0.15s;
+}
+
+.wds-chip:active { transform: scale(0.95); }
+
+.wds-chip.selected {
+    background: #e0e7ff;
+    border-color: var(--primary);
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.wds-note {
+    width: 100%;
+    border: 1.5px solid var(--gray-200);
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: none;
+    outline: none;
+    box-sizing: border-box;
+    color: var(--gray-800);
+}
+
+.wds-note:focus { border-color: var(--primary); }
+
+.wds-save {
+    width: 100%;
+    margin-top: 4px;
+}
+
+/* ============================================
    MINI LEADERBOARD
    ============================================ */
 .mini-leaderboard {
@@ -894,7 +1096,7 @@ body {
    ============================================ */
 .hamburger-btn {
     position: fixed;
-    bottom: 24px;
+    bottom: calc(24px + env(safe-area-inset-bottom));
     right: 24px;
     width: 60px;
     height: 60px;
@@ -910,8 +1112,10 @@ body {
     gap: 5px;
     box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
     transition: transform 0.2s, box-shadow 0.2s;
-    padding-bottom: env(safe-area-inset-bottom);
 }
+
+/* Hide the floating menu button while any modal is open */
+body.modal-open .hamburger-btn { display: none; }
 
 .hamburger-btn:active {
     transform: scale(0.95);
@@ -4342,3 +4546,1011 @@ body {
     background: var(--gray-100);
     color: var(--gray-400);
 }
+
+/* ============================================
+   CENTURY CLUB — Confetti, Celebration,
+   Card Builder, Hall of Fame
+   ============================================ */
+
+/* Confetti canvas — shown/hidden via JS only */
+.confetti-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 1201;
+    pointer-events: none;
+    display: none;
+}
+
+/* Hamburger sits above canvas */
+.hamburger-btn { z-index: 1202 !important; }
+
+/* Century Club full-screen celebration overlay */
+.century-club-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1300;
+    background: rgba(0,0,0,0.85);
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    overflow-y: auto;
+}
+.century-club-overlay.active { display: flex; }
+
+.cc-cel-box {
+    position: relative;
+    background: linear-gradient(145deg, #1a1a2e, #16213e, #0f3460);
+    border-radius: 28px;
+    padding: 40px 28px 32px;
+    max-width: 360px;
+    width: 100%;
+    text-align: center;
+    color: #fff;
+    box-shadow: 0 0 60px rgba(99,102,241,0.5), 0 0 120px rgba(139,92,246,0.2);
+    border: 1px solid rgba(255,255,255,0.12);
+    overflow: hidden;
+}
+
+.cc-cel-glow {
+    position: absolute;
+    inset: -40px;
+    background: radial-gradient(ellipse at center, rgba(99,102,241,0.35) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.cc-cel-emoji {
+    font-size: 72px;
+    line-height: 1;
+    margin-bottom: 8px;
+    animation: cc-pop 0.6s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+@keyframes cc-pop {
+    0%   { transform: scale(0) rotate(-20deg); opacity: 0; }
+    100% { transform: scale(1) rotate(0deg);   opacity: 1; }
+}
+
+.cc-cel-badge {
+    display: inline-block;
+    background: linear-gradient(90deg,#f7971e,#ffd200);
+    color: #1a1a1a;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 2.5px;
+    padding: 4px 14px;
+    border-radius: 50px;
+    margin-bottom: 16px;
+}
+
+.cc-cel-title {
+    font-size: 28px;
+    font-weight: 900;
+    line-height: 1.2;
+    margin-bottom: 10px;
+    background: linear-gradient(90deg,#fff,#c4b5fd);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.cc-cel-sub {
+    font-size: 14px;
+    color: rgba(255,255,255,0.7);
+    margin-bottom: 24px;
+    line-height: 1.5;
+}
+
+.cc-cel-stats {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-bottom: 28px;
+}
+
+.cc-cel-stat {
+    flex: 1;
+    background: rgba(255,255,255,0.1);
+    border-radius: 14px;
+    padding: 12px 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.cc-cel-stat span {
+    font-size: 22px;
+    font-weight: 800;
+    color: #ffd200;
+}
+
+.cc-cel-stat small {
+    font-size: 10px;
+    color: rgba(255,255,255,0.6);
+    letter-spacing: 0.5px;
+}
+
+.cc-cel-btn-primary {
+    width: 100%;
+    padding: 14px;
+    border-radius: 14px;
+    border: none;
+    background: linear-gradient(90deg,#6366f1,#8b5cf6);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-bottom: 10px;
+    letter-spacing: 0.3px;
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 4px 20px rgba(99,102,241,0.5);
+}
+.cc-cel-btn-primary:active { transform: scale(0.97); }
+
+.cc-cel-btn-secondary {
+    width: 100%;
+    padding: 10px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: transparent;
+    color: rgba(255,255,255,0.5);
+    font-size: 13px;
+    cursor: pointer;
+}
+
+/* Card builder modal */
+.cc-modal .modal-body { padding: 0; }
+
+.cc-builder-body {
+    padding: 16px 16px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Live card preview */
+.cc-card-preview {
+    border-radius: 20px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+    flex-shrink: 0;
+}
+
+.cc-card-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 14px 16px 12px;
+    gap: 5px;
+    position: relative;
+    z-index: 1;
+}
+
+.cc-card-watermark {
+    position: absolute;
+    top: -8px;
+    right: 8px;
+    font-size: 72px;
+    opacity: 0.08;
+    pointer-events: none;
+    user-select: none;
+    line-height: 1;
+    z-index: 0;
+}
+
+.cc-card-photo {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid rgba(255,255,255,0.7);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.cc-card-photo-placeholder {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    border: 3px solid rgba(255,255,255,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+}
+
+.hof-card-photo {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid rgba(255,255,255,0.6);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.hof-card-photo-placeholder {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    border: 3px solid rgba(255,255,255,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+}
+
+.cc-card-badge {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    padding: 3px 10px;
+    border-radius: 50px;
+    border: 1px solid;
+}
+
+.cc-card-name {
+    font-size: 18px;
+    font-weight: 900;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    text-align: center;
+    line-height: 1.1;
+}
+
+.cc-card-hundred {
+    font-size: 13px;
+    font-weight: 800;
+    opacity: 0.95;
+}
+
+.cc-card-proud {
+    font-size: 11px;
+    font-style: italic;
+    text-align: center;
+    border-radius: 8px;
+    padding: 5px 10px;
+    line-height: 1.4;
+    max-width: 100%;
+}
+
+.cc-card-stats {
+    display: flex;
+    gap: 6px;
+    width: 100%;
+    justify-content: space-around;
+    padding-top: 8px;
+    margin-top: 2px;
+}
+
+.cc-card-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+}
+
+.cc-card-stat-num {
+    font-size: 16px;
+    font-weight: 900;
+}
+
+.cc-card-stat-lbl {
+    font-size: 8px;
+    opacity: 0.75;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+}
+
+.cc-card-footer {
+    font-size: 9px;
+    opacity: 0.55;
+    letter-spacing: 0.4px;
+    text-align: center;
+}
+
+/* Builder form */
+.cc-builder-body {
+    padding: 0 0 100px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+/* Card preview — full width, no side padding */
+.cc-card-preview {
+    border-radius: 0;
+    margin: 0;
+    box-shadow: none;
+    border-bottom: 4px solid rgba(0,0,0,0.08);
+}
+
+.cc-card-inner {
+    padding: 20px 20px 16px;
+    gap: 6px;
+}
+
+/* Form sections */
+.cc-builder-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 18px 16px;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.cc-builder-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+}
+
+/* Photo upload — full width tap target */
+.cc-photo-upload-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    border: 2px dashed var(--gray-300);
+    color: var(--gray-500);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--gray-50);
+    transition: all 0.2s;
+}
+.cc-photo-upload-btn:active { border-color: var(--primary); color: var(--primary); background: #eef2ff; }
+
+.cc-proud-input {
+    width: 100%;
+    padding: 13px 14px;
+    border: 1.5px solid var(--gray-200);
+    border-radius: 12px;
+    font-size: 15px;
+    font-family: inherit;
+    outline: none;
+    background: var(--gray-50);
+    transition: border-color 0.2s, background 0.2s;
+}
+.cc-proud-input:focus { border-color: var(--primary); background: #fff; }
+
+.cc-theme-dots {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.cc-theme-dot {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 3px solid transparent;
+    transition: transform 0.15s, border-color 0.15s;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+}
+.cc-theme-dot.selected {
+    border-color: var(--gray-800);
+    transform: scale(1.18);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+
+.cc-builder-actions {
+    display: flex;
+    gap: 10px;
+    padding: 16px;
+}
+.cc-builder-actions .btn-secondary,
+.cc-builder-actions .btn-primary {
+    flex: 1;
+    padding: 14px 10px;
+    font-size: 14px;
+    font-weight: 700;
+    border-radius: 14px;
+}
+.cc-builder-actions .btn-secondary,
+.cc-builder-actions .btn-primary {
+    flex: 1;
+    padding: 12px;
+    font-size: 14px;
+}
+
+/* Hall of Fame screen */
+.hof-header {
+    position: relative;
+    overflow: hidden;
+    padding: 56px 20px 40px;
+    text-align: center;
+}
+
+.hof-header-bg {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    z-index: 0;
+}
+
+.hof-header-content {
+    position: relative;
+    z-index: 1;
+    color: #fff;
+}
+
+.hof-header-icon {
+    font-size: 52px;
+    margin-bottom: 8px;
+    animation: cc-pop 0.6s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+.hof-header-title {
+    font-size: 32px;
+    font-weight: 900;
+    background: linear-gradient(90deg, #ffd200, #f7971e);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 6px;
+}
+
+.hof-header-sub {
+    color: rgba(255,255,255,0.65);
+    font-size: 14px;
+}
+
+.hof-body {
+    padding: 24px 16px 40px;
+    background: var(--gray-100);
+    min-height: 50vh;
+}
+
+.hof-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.hof-card {
+    border-radius: 20px;
+    overflow: hidden;
+    padding: 20px 14px 16px;
+    position: relative;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+    animation: cc-pop 0.4s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+.hof-card-watermark {
+    position: absolute;
+    top: -8px;
+    right: 6px;
+    font-size: 60px;
+    opacity: 0.07;
+    pointer-events: none;
+    user-select: none;
+    line-height: 1;
+}
+
+.hof-card-rank {
+    position: absolute;
+    top: 10px;
+    left: 12px;
+    font-size: 16px;
+    font-weight: 800;
+}
+
+.hof-card-photo {
+    width: 64px;
+    height: 64px;
+}
+.hof-card-photo-placeholder {
+    width: 64px;
+    height: 64px;
+    font-size: 28px;
+}
+
+.hof-card-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 50px;
+    border: 1px solid;
+    letter-spacing: 0.3px;
+}
+
+.hof-card-name {
+    font-size: 15px;
+    font-weight: 800;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.hof-card-proud {
+    font-size: 11px;
+    font-style: italic;
+    opacity: 0.85;
+    line-height: 1.4;
+    text-align: center;
+}
+
+.hof-card-stats {
+    display: flex;
+    gap: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    opacity: 0.9;
+}
+
+.hof-card-date {
+    font-size: 10px;
+    opacity: 0.6;
+    letter-spacing: 0.3px;
+}
+
+.hof-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--gray-500);
+}
+.hof-empty-icon { font-size: 56px; margin-bottom: 16px; }
+.hof-empty h3 { font-size: 18px; color: var(--gray-700); margin-bottom: 8px; }
+.hof-empty p  { font-size: 14px; line-height: 1.6; }
+
+/* Auto-assigned title display */
+.cc-auto-title {
+    display: inline-block;
+    padding: 10px 18px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff;
+    border-radius: 50px;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    box-shadow: 0 4px 14px rgba(99,102,241,0.35);
+}
+
+/* Admin Century Club test strip */
+.admin-test-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #f3f0ff;
+    border: 1.5px dashed #a78bfa;
+    border-radius: 12px;
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #6d28d9;
+}
+
+.btn-sm {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: none;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.btn-purple {
+    background: #7c3aed;
+    color: #fff;
+}
+
+/* Card builder — full-height bottom sheet */
+.cc-modal {
+    align-items: flex-end !important;
+    padding: 0 !important;
+}
+
+.cc-modal-content {
+    width: 100%;
+    max-width: 100%;
+    max-height: 94vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    display: flex;
+    flex-direction: column;
+    border-radius: 24px 24px 0 0;
+    animation: slideUp 0.3s ease !important;
+}
+
+.cc-modal .modal-body {
+    padding: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    flex: 1;
+}
+
+
+/* Hall of Fame back button */
+.hof-back-btn {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 2;
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: #fff;
+    font-size: 20px;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+}
+
+/* ============================================
+   CENTURY CLUB — Canvas card + fun builder
+   ============================================ */
+.cc-canvas-wrap {
+    padding: 16px 16px 6px;
+    display: flex;
+    justify-content: center;
+    background: var(--gray-50);
+}
+.cc-card-canvas {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 52vh;
+    border-radius: 22px;
+    box-shadow: 0 14px 44px rgba(0,0,0,0.28);
+}
+
+.cc-fun-form {
+    padding: 12px 18px 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.cc-fun-tip {
+    text-align: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--gray-500);
+    margin: 2px 0 4px;
+}
+
+.cc-fun-photo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 15px 18px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #eef2ff, #faf5ff);
+    border: 2px dashed #c4b5fd;
+    cursor: pointer;
+    transition: transform 0.12s;
+}
+.cc-fun-photo:active { transform: scale(0.98); }
+.cc-fun-photo-emoji { font-size: 28px; }
+.cc-fun-photo-text { font-size: 16px; font-weight: 700; color: #6d28d9; }
+
+.cc-fun-input {
+    width: 100%;
+    padding: 16px 18px;
+    border-radius: 16px;
+    border: 2px solid var(--gray-200);
+    background: var(--gray-50);
+    font-size: 16px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s, background 0.2s;
+}
+.cc-fun-input:focus { border-color: var(--primary); background: #fff; }
+
+.cc-fun-vibe {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 2px;
+}
+.cc-fun-vibe-label { font-size: 15px; font-weight: 700; color: var(--gray-700); }
+.cc-fun-vibe .cc-theme-dots { gap: 10px; }
+.cc-fun-vibe .cc-theme-dot { width: 38px; height: 38px; }
+
+.cc-builder-actions {
+    display: flex;
+    gap: 10px;
+    padding: 14px 16px;
+    align-items: stretch;
+}
+.cc-share-btn {
+    flex: 1;
+    border: none;
+    border-radius: 16px;
+    padding: 17px;
+    font-size: 16px;
+    font-weight: 800;
+    color: #fff;
+    background: linear-gradient(135deg, #25D366, #0f9d6f);
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(37,211,102,0.45);
+    transition: transform 0.12s;
+}
+.cc-share-btn:active { transform: scale(0.97); }
+.cc-download-btn {
+    width: 58px;
+    border: none;
+    border-radius: 16px;
+    font-size: 22px;
+    background: var(--gray-100);
+    cursor: pointer;
+    transition: transform 0.12s;
+}
+.cc-download-btn:active { transform: scale(0.95); }
+
+/* Template / design picker */
+.cc-tpl-row {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 2px;
+}
+.cc-tpl-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.cc-tpl-pill {
+    padding: 9px 16px;
+    border-radius: 50px;
+    border: 2px solid var(--gray-200);
+    background: var(--gray-50);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--gray-600);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.cc-tpl-pill.selected {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: #fff;
+}
+
+/* ============================================
+   CENTURY CLUB — scroll/layout fixes
+   ============================================ */
+/* Lock the page behind any open modal (kills background scroll bleed) */
+body.modal-open {
+    position: fixed;
+    left: 0;
+    right: 0;
+    width: 100%;
+    overflow: hidden;
+}
+
+/* Card builder sheet: header fixed, middle scrolls, card pinned top, actions pinned bottom */
+.cc-modal-content {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.cc-modal .modal-header { flex-shrink: 0; }
+
+.cc-builder-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;   /* stop scroll chaining to the page */
+    padding: 0;
+}
+
+/* Keep the live card visible while you tweak design/colour below */
+.cc-canvas-wrap {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    background: var(--gray-50);
+    box-shadow: 0 8px 14px -10px rgba(0,0,0,0.4);
+}
+.cc-card-canvas { max-height: 38vh; }
+
+/* Always-visible action buttons */
+.cc-builder-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 6;
+    background: #fff;
+    box-shadow: 0 -8px 18px -10px rgba(0,0,0,0.3);
+    padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+}
+
+/* ============================================
+   CENTURY CLUB — action button fix
+   ============================================ */
+/* Raise the builder above the floating menu button so taps always land */
+.cc-modal { z-index: 1500; }
+
+/* Stack the two actions full-width — big tap targets, no narrow zones */
+.cc-builder-actions {
+    flex-direction: column;
+    gap: 10px;
+}
+.cc-share-btn { width: 100%; }
+.cc-download-btn2 {
+    width: 100%;
+    border: 2px solid var(--gray-200);
+    border-radius: 16px;
+    padding: 15px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--gray-700);
+    background: var(--gray-50);
+    cursor: pointer;
+    transition: transform 0.12s, background 0.15s;
+}
+.cc-download-btn2:active { transform: scale(0.98); background: var(--gray-100); }
+
+/* ============================================
+   CENTURY CLUB — give the form more room
+   ============================================ */
+/* Smaller pinned preview */
+.cc-canvas-wrap { padding: 8px 14px 6px; }
+.cc-card-canvas { max-height: 30vh; }
+
+/* More room + breathing space in the scrollable middle */
+.cc-fun-form { padding: 12px 18px 16px; gap: 16px; }
+
+/* Compact, stacked action bar */
+.cc-builder-actions {
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+}
+.cc-share-btn { width: 100%; padding: 14px; font-size: 15px; }
+.cc-download-btn2 { width: 100%; padding: 12px; font-size: 14px; }
+
+/* ============================================
+   CENTURY CLUB — swipeable compact form + bigger card
+   ============================================ */
+/* Bigger pinned card now the form is a single compact row */
+.cc-card-canvas { max-height: 46vh; }
+.cc-canvas-wrap { padding: 8px 14px 4px; }
+
+.cc-fun-form { padding: 8px 0 6px; gap: 6px; }
+.cc-fun-tip {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--gray-400);
+    margin: 0 0 2px;
+    letter-spacing: 0.2px;
+}
+
+/* Horizontal swipe carousel of input panels */
+.cc-carousel {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    gap: 10px;
+    padding: 2px 16px 4px;
+    scrollbar-width: none;
+}
+.cc-carousel::-webkit-scrollbar { display: none; }
+
+.cc-panel {
+    flex: 0 0 84%;
+    scroll-snap-align: center;
+    background: var(--gray-50);
+    border: 1.5px solid var(--gray-200);
+    border-radius: 16px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    min-height: 96px;
+    justify-content: center;
+}
+.cc-panel-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--gray-600);
+    letter-spacing: 0.2px;
+}
+
+.cc-photo-mini {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    border-radius: 12px;
+    border: 2px dashed #c4b5fd;
+    background: #faf5ff;
+    color: #6d28d9;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: center;
+}
+.cc-photo-mini:active { background: #f3e8ff; }
+
+.cc-proud-mini {
+    width: 100%;
+    padding: 11px 13px;
+    border: 2px solid var(--gray-200);
+    border-radius: 12px;
+    font-size: 15px;
+    font-family: inherit;
+    outline: none;
+    background: #fff;
+}
+.cc-proud-mini:focus { border-color: var(--primary); }
+
+/* Compact pills + dots inside panels */
+.cc-panel .cc-tpl-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.cc-panel .cc-tpl-pill {
+    padding: 6px 11px;
+    border-radius: 50px;
+    border: 2px solid var(--gray-200);
+    background: #fff;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--gray-600);
+    cursor: pointer;
+}
+.cc-panel .cc-tpl-pill.selected { border-color: var(--primary); background: var(--primary); color: #fff; }
+
+.cc-panel .cc-theme-dots { display: flex; gap: 12px; }
+.cc-panel .cc-theme-dot {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    border: 3px solid transparent;
+    box-shadow: 0 2px 7px rgba(0,0,0,0.2);
+    cursor: pointer;
+}
+.cc-panel .cc-theme-dot.selected { border-color: var(--gray-800); transform: scale(1.15); }
+
+/* Progress dots */
+.cc-dots { display: flex; justify-content: center; gap: 7px; padding: 6px 0 2px; }
+.cc-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--gray-300);
+    transition: all 0.2s;
+    cursor: pointer;
+}
+.cc-dot.active { background: var(--primary); width: 20px; border-radius: 4px; }
+
+/* Slightly smaller share button */
+.cc-share-btn { padding: 13px; font-size: 15px; }
+
+/* ============================================
+   CENTURY CLUB — dashboard "make your card" banner
+   ============================================ */
+.century-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(99,102,241,0.4);
+    animation: cc-pop 0.5s cubic-bezier(0.34,1.56,0.64,1);
+}
+.century-banner:active { transform: scale(0.99); }
+.century-banner .cb-emoji { font-size: 30px; line-height: 1; }
+.century-banner .cb-text { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.century-banner .cb-text strong { font-size: 16px; font-weight: 800; }
+.century-banner .cb-text span { font-size: 13px; opacity: 0.9; }
+.century-banner .cb-arrow { font-size: 22px; font-weight: 800; opacity: 0.9; }
