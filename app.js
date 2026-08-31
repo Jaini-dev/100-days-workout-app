@@ -531,7 +531,8 @@ function _buildParticipant(row, checkinRows) {
         customWorkoutTypes: row.custom_workout_types || [],
         checkinDetails: row.checkin_details || {},
         centuryClub: row.century_club || null,
-        profilePhotoUrl: row.profile_photo_url || null,
+        _profilePhotoPath: row.profile_photo_url || null,
+        profilePhotoUrl: null, // resolved to signed URL in supabaseLogin
         isAdmin: row.is_admin || false,
         isSuperAdmin: row.is_super_admin || false,
         joinDate: row.join_date || null,
@@ -583,6 +584,19 @@ async function supabaseLogin(phone) {
     const participants = (allRows || []).map(r => _buildParticipant(r, checkinsByPhone[r.phone]));
     const user = participants.find(p => p.phone === phone) || _buildParticipant(userRow, checkinsByPhone[phone]);
 
+    // Resolve profile photo paths → signed URLs (private bucket, 1-hour expiry)
+    const photoPaths = participants.filter(p => p._profilePhotoPath).map(p => p._profilePhotoPath);
+    if (photoPaths.length > 0) {
+        const { data: signedList } = await sb.storage.from(CONFIG.PHOTO_BUCKET).createSignedUrls(photoPaths, 3600);
+        const urlMap = {};
+        (signedList || []).forEach(item => { if (item.signedUrl) urlMap[item.path] = item.signedUrl; });
+        participants.forEach(p => {
+            if (p._profilePhotoPath && urlMap[p._profilePhotoPath]) {
+                p.profilePhotoUrl = urlMap[p._profilePhotoPath];
+            }
+        });
+    }
+
     // Fetch Season 6 stats for the logged-in user
     const { data: s6Rows } = await sb.from('checkins').select('date,status')
         .eq('phone', phone).gte('date', '2026-02-01').lte('date', '2026-07-31');
@@ -622,7 +636,7 @@ async function supabaseSaveProfile(user) {
         custom_workout_types: user.customWorkoutTypes || [],
         checkin_details: user.checkinDetails || {},
         century_club: user.centuryClub || null,
-        profile_photo_url: user.profilePhotoUrl || null,
+        profile_photo_url: user._profilePhotoPath || null,
         is_admin: user.isAdmin || false,
         is_super_admin: user.isSuperAdmin || false,
     }, { onConflict: 'phone' });
@@ -714,11 +728,12 @@ async function uploadProfilePhoto(file) {
         const { error: upErr } = await sb.storage.from(CONFIG.PHOTO_BUCKET)
             .upload(path, blob, { contentType: 'image/jpeg', upsert: true });
         if (upErr) { showToast('Photo upload failed', 'error'); return; }
-        const { data: urlData } = sb.storage.from(CONFIG.PHOTO_BUCKET).getPublicUrl(path);
-        const url = urlData.publicUrl + '?t=' + Date.now();
+        const { data: signedData } = await sb.storage.from(CONFIG.PHOTO_BUCKET).createSignedUrl(path, 3600);
+        const url = signedData?.signedUrl || null;
+        appState.currentUser._profilePhotoPath = path;
         appState.currentUser.profilePhotoUrl = url;
         const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
-        if (idx >= 0) appState.participants[idx].profilePhotoUrl = url;
+        if (idx >= 0) { appState.participants[idx]._profilePhotoPath = path; appState.participants[idx].profilePhotoUrl = url; }
         await supabaseSaveProfile(appState.currentUser);
         saveData();
         renderProfilePhotoUI();
