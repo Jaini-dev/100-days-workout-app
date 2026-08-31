@@ -4621,18 +4621,53 @@ window.changePassword = async function() {
     showToast('Password updated!', 'success');
 };
 
-function removeParticipant(phone) {
+async function removeParticipant(phone) {
     const participant = appState.participants.find(p => p.phone === phone);
     if (!participant) return;
 
-    if (!confirm(`Are you sure you want to remove ${participant.name} from the challenge?`)) {
-        return;
-    }
+    if (!confirm(`Remove ${participant.name} permanently? This deletes them from the database too.`)) return;
+
+    const sb = getSB();
+    await sb.from('checkins').delete().eq('phone', phone);
+    await sb.from('participants').delete().eq('phone', phone);
 
     appState.participants = appState.participants.filter(p => p.phone !== phone);
     saveData();
     renderAdminDashboard();
-    showToast(`${participant.name} removed`, '');
+    showToast(`${participant.name} removed`, 'success');
+}
+
+async function deleteTestAccounts() {
+    if (!confirm('Clean up test data?\n• Delete accounts 9999999991 and 9999999992 completely\n• Wipe S7 data for 9920854014 (keep account, reset season)')) return;
+    const sb = getSB();
+    showToast('Cleaning up…', '');
+
+    // Fully delete dummy accounts
+    const dummies = ['9999999991', '9999999992'];
+    await sb.from('checkins').delete().in('phone', dummies);
+    await sb.from('participants').delete().in('phone', dummies);
+
+    // Reset 9920854014: delete S7 checkins and remove s7 flag from season_setup
+    await sb.from('checkins').delete().eq('phone', '9920854014').gte('date', challengeSettings.startDate);
+    const { data: row } = await sb.from('participants').select('season_setup').eq('phone', '9920854014').single();
+    if (row) {
+        const setup = row.season_setup || {};
+        delete setup.s7;
+        await sb.from('participants').update({ season_setup: setup }).eq('phone', '9920854014');
+    }
+
+    // Update local state
+    appState.participants = appState.participants.filter(p => !dummies.includes(p.phone));
+    const idx = appState.participants.findIndex(p => p.phone === '9920854014');
+    if (idx >= 0) {
+        appState.participants[idx].checkins = Object.fromEntries(
+            Object.entries(appState.participants[idx].checkins || {}).filter(([d]) => d < challengeSettings.startDate)
+        );
+        if (appState.participants[idx].seasonSetup) delete appState.participants[idx].seasonSetup.s7;
+    }
+    saveData();
+    renderAdminDashboard();
+    showToast('✅ Test data cleaned up', 'success');
 }
 
 // ============================================
@@ -5140,6 +5175,7 @@ window.joinTeam = joinTeam;
 window.leaveTeam = leaveTeam;
 window.confirmLeaveTeam = confirmLeaveTeam;
 window.showS6HistoryModal = showS6HistoryModal;
+window.deleteTestAccounts = deleteTestAccounts;
 window.dismissWorkoutDetails = dismissWorkoutDetails;
 window.selectWdsChip = selectWdsChip;
 window.saveWorkoutDetails = saveWorkoutDetails;
