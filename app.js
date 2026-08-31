@@ -8,25 +8,37 @@
 // CONFIGURATION
 // ============================================
 const CONFIG = {
-    SEASON: 'Season 6',
+    SEASON: 'Season 7',
     STORAGE_KEY: 'workout100_data_v5',
-    VERSION: '5.0.0',
-    SUPER_ADMIN_CODE_HASH: '31a82b', // Hashed admin code - not stored in plaintext
+    VERSION: '6.0.0',
+    SUPER_ADMIN_CODE_HASH: '31a82b',
     MAX_PAST_DAYS: 7,
-    AUTO_BACKUP_INTERVAL: 24 * 60 * 60 * 1000, // 24 hours
+    AUTO_BACKUP_INTERVAL: 24 * 60 * 60 * 1000,
     REMINDER_SNOOZE_HOURS: 4,
-    TOP_RANKS_VISIBLE: 5, // Only show ranks for top 5
-    // Google Sheets API
-    API_URL: 'https://script.google.com/macros/s/AKfycbz7oWHMpsI_jHb7kjsjtCJGclLXlANndjDdYAzeE0PUcbp7yLenJDSfCMWoMiDehe9O/exec',
-    USE_CLOUD_SYNC: true // Enable cloud sync with Google Sheets
+    TOP_RANKS_VISIBLE: 5,
+    SUPABASE_URL: 'https://djyzaoisfslgkkfmgzuy.supabase.co',
+    SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqeXphb2lzZnNsZ2trZm1nenV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NjI0NjgsImV4cCI6MjA5MDQzODQ2OH0.YC5FQjZGn1a8wMaE8ykMlOHBURNACrZRiBDtXd-TLjw',
+    PHOTO_BUCKET: 'profile-photos',
+    MAX_PHOTO_BYTES: 200 * 1024,
 };
+
+// ============================================
+// SUPABASE CLIENT
+// ============================================
+let _sb = null;
+function getSB() {
+    if (!_sb) {
+        _sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+    }
+    return _sb;
+}
 
 // Challenge settings (can be modified by admin)
 let challengeSettings = {
-    startDate: '2026-02-01',  // Challenge starts Feb 1
-    endDate: '2026-07-31',    // Challenge ends July 31 (181 days window)
+    startDate: '2026-09-01',  // Challenge starts Sep 1
+    endDate: '2027-02-28',    // Challenge ends Feb 28 (181 days window)
     totalDays: 100,           // Need to complete 100 workouts in this period
-    seasonName: 'Season 6'
+    seasonName: 'Season 7'
 };
 
 // ============================================
@@ -266,7 +278,7 @@ function getCurrentDay() {
 }
 
 function getChallengePeriodDays() {
-    // Returns total days in the challenge period (181 days: Feb 1 - July 31)
+    // Returns total days in the challenge period
     const start = new Date(challengeSettings.startDate);
     const end = new Date(challengeSettings.endDate);
     start.setHours(0, 0, 0, 0);
@@ -489,9 +501,11 @@ function saveData() {
             lastSaved: new Date().toISOString()
         };
         localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(data));
-
-        // Check for auto-backup
         checkAutoBackup();
+        // Sync profile to Supabase in background (fire-and-forget)
+        if (appState.currentUser?.phone) {
+            supabaseSaveProfile(appState.currentUser).catch(() => {});
+        }
     } catch (e) {
         console.error('Failed to save data:', e);
         showToast('Warning: Could not save data!', 'error');
@@ -499,84 +513,245 @@ function saveData() {
 }
 
 // ============================================
-// CLOUD SYNC WITH GOOGLE SHEETS
+// SUPABASE DATA LAYER
 // ============================================
 
-async function apiCall(action, data = {}) {
-    if (!CONFIG.USE_CLOUD_SYNC || !CONFIG.API_URL) {
-        return { success: false, error: 'Cloud sync not configured' };
-    }
-
-    try {
-        const response = await fetch(CONFIG.API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'text/plain', // Required for Google Apps Script
-            },
-            body: JSON.stringify({ action, ...data })
-        });
-
-        const result = await response.json();
-        return result;
-    } catch (error) {
-        console.error('API call failed:', error);
-        return { success: false, error: error.message };
-    }
+// Build a participant object from a Supabase row + its checkins rows
+function _buildParticipant(row, checkinRows) {
+    const checkins = {};
+    (checkinRows || []).forEach(c => { checkins[c.date] = c.status; });
+    return {
+        phone: row.phone,
+        name: row.name,
+        goal: row.goal || '',
+        commitment: row.commitment || '',
+        timezone: row.timezone || 'Asia/Kolkata',
+        weeklyGoal: row.weekly_goal || null,
+        teamName: row.team_name || null,
+        customWorkoutTypes: row.custom_workout_types || [],
+        checkinDetails: row.checkin_details || {},
+        centuryClub: row.century_club || null,
+        profilePhotoUrl: row.profile_photo_url || null,
+        isAdmin: row.is_admin || false,
+        isSuperAdmin: row.is_super_admin || false,
+        joinDate: row.join_date || null,
+        checkins,
+    };
 }
 
-async function cloudRegister(userData) {
-    showLoading();
-    const result = await apiCall('register', {
-        name: userData.name,
+async function supabaseRegister(userData) {
+    const sb = getSB();
+    const { error } = await sb.from('participants').upsert({
         phone: userData.phone,
-        goal: userData.goal,
-        commitment: userData.commitment
+        name: userData.name,
+        goal: userData.goal || '',
+        commitment: userData.commitment || '',
+        timezone: userData.timezone || 'Asia/Kolkata',
+        join_date: getTodayString(),
+    }, { onConflict: 'phone', ignoreDuplicates: false });
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+}
+
+async function supabaseLogin(phone) {
+    const sb = getSB();
+    const seasonStart = challengeSettings.startDate;
+    const seasonEnd = challengeSettings.endDate;
+
+    // Fetch the user row
+    const { data: userRow, error: userErr } = await sb
+        .from('participants').select('*').eq('phone', phone).single();
+    if (userErr || !userRow) return { success: false, error: 'User not found' };
+
+    // Fetch ALL participants (for leaderboard)
+    const { data: allRows, error: allErr } = await sb.from('participants').select('*');
+    if (allErr) return { success: false, error: allErr.message };
+
+    // Fetch all checkins for this season
+    const { data: allCheckins, error: ciErr } = await sb
+        .from('checkins').select('*')
+        .gte('date', seasonStart).lte('date', seasonEnd);
+    if (ciErr) return { success: false, error: ciErr.message };
+
+    // Group checkins by phone
+    const checkinsByPhone = {};
+    (allCheckins || []).forEach(c => {
+        if (!checkinsByPhone[c.phone]) checkinsByPhone[c.phone] = [];
+        checkinsByPhone[c.phone].push(c);
     });
-    hideLoading();
 
-    if (result.success) {
-        showToast('Registered successfully!', 'success');
+    const participants = (allRows || []).map(r => _buildParticipant(r, checkinsByPhone[r.phone]));
+    const user = participants.find(p => p.phone === phone) || _buildParticipant(userRow, checkinsByPhone[phone]);
+
+    // Fetch Season 6 stats for the logged-in user
+    const { data: s6Rows } = await sb.from('checkins').select('date,status')
+        .eq('phone', phone).gte('date', '2026-02-01').lte('date', '2026-07-31');
+    if (s6Rows && s6Rows.length > 0) {
+        const yDates = s6Rows.filter(r => r.status === 'Y').map(r => r.date).sort();
+        let best = 0, curr = 0, prev = null;
+        for (const d of yDates) {
+            curr = (prev && (new Date(d) - new Date(prev)) / 86400000 === 1) ? curr + 1 : 1;
+            best = Math.max(best, curr);
+            prev = d;
+        }
+        user.lastSeason = { season: 'Season 6', days: yDates.length, bestStreak: best };
     }
-    return result;
+
+    return { success: true, data: { user, participants } };
 }
 
-async function cloudLogin(phone) {
-    showLoading();
-    const result = await apiCall('login', { phone });
-    hideLoading();
-
-    if (result.success && result.data) {
-        // Update local state with cloud data
-        appState.participants = result.data.participants || [];
-        appState.currentUser = result.data.user;
-        saveData(); // Save to localStorage as backup
-    }
-    return result;
+async function supabaseCheckin(phone, date, status) {
+    const sb = getSB();
+    const { error } = await sb.from('checkins').upsert(
+        { phone, date, status },
+        { onConflict: 'phone,date' }
+    );
+    return error ? { success: false, error: error.message } : { success: true };
 }
 
-async function cloudCheckin(phone, date, status) {
-    // NOTE: We intentionally do NOT re-fetch the full profile from the cloud here.
-    // submitCheckin() has already updated local state optimistically. When a user
-    // logs several days in quick succession, multiple checkin requests are in
-    // flight at once. A full re-fetch (cloudLogin) that returns before the other
-    // writes have been persisted would overwrite local state with stale data and
-    // wipe out the days the user just tapped. The write below is enough to persist
-    // this single day; a manual refresh pulls everything else back down.
-    return await apiCall('checkin', { phone, date, status });
+async function supabaseSaveProfile(user) {
+    const sb = getSB();
+    const { error } = await sb.from('participants').upsert({
+        phone: user.phone,
+        name: user.name,
+        goal: user.goal || '',
+        commitment: user.commitment || '',
+        timezone: user.timezone || 'Asia/Kolkata',
+        weekly_goal: user.weeklyGoal || null,
+        team_name: user.teamName || null,
+        custom_workout_types: user.customWorkoutTypes || [],
+        checkin_details: user.checkinDetails || {},
+        century_club: user.centuryClub || null,
+        profile_photo_url: user.profilePhotoUrl || null,
+        is_admin: user.isAdmin || false,
+        is_super_admin: user.isSuperAdmin || false,
+    }, { onConflict: 'phone' });
+    return error ? { success: false, error: error.message } : { success: true };
 }
 
 async function refreshFromCloud() {
-    if (!appState.currentUser || !appState.currentUser.phone) {
-        return { success: false, error: 'Not logged in' };
-    }
-
-    const result = await cloudLogin(appState.currentUser.phone);
+    if (!appState.currentUser?.phone) return { success: false };
+    const result = await supabaseLogin(appState.currentUser.phone);
     if (result.success) {
+        // Merge: keep local checkins that aren't in Supabase yet
+        const localCheckins = appState.currentUser.checkins || {};
+        const remoteUser = result.data.user;
+        const merged = { ...localCheckins };
+        Object.entries(remoteUser.checkins || {}).forEach(([d, s]) => { merged[d] = s; });
+        remoteUser.checkins = merged;
+        appState.currentUser = remoteUser;
+        appState.participants = result.data.participants;
+        appState.participants.forEach(p => {
+            if (p.phone === remoteUser.phone) p.checkins = merged;
+        });
+        saveData();
         showToast('Data refreshed!', 'success');
         updateDashboard();
     }
     return result;
 }
+
+// Subscribe to real-time checkin updates
+function subscribeRealtime() {
+    const sb = getSB();
+    sb.channel('checkins-live')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'checkins' }, payload => {
+            const c = payload.new || payload.old;
+            if (!c) return;
+            const p = appState.participants.find(x => x.phone === c.phone);
+            if (p) {
+                if (!p.checkins) p.checkins = {};
+                if (payload.eventType !== 'DELETE') p.checkins[c.date] = c.status;
+                else delete p.checkins[c.date];
+            }
+            if (appState.currentTab === 'leaderboard') renderLeaderboard(appState.leaderboardCategory || 'thisWeek');
+        })
+        .subscribe();
+}
+
+// ============================================
+// IMAGE COMPRESSION + PROFILE PHOTO UPLOAD
+// ============================================
+
+async function compressImage(file, maxBytes) {
+    return new Promise((resolve, reject) => {
+        if (!file.type.startsWith('image/')) { reject(new Error('Only images allowed')); return; }
+        const reader = new FileReader();
+        reader.onload = e => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX_DIM = 400;
+                let w = img.width, h = img.height;
+                if (w > h && w > MAX_DIM) { h = Math.round(h * MAX_DIM / w); w = MAX_DIM; }
+                else if (h > MAX_DIM) { w = Math.round(w * MAX_DIM / h); h = MAX_DIM; }
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                let quality = 0.85;
+                const tryCompress = () => {
+                    canvas.toBlob(blob => {
+                        if (!blob) { reject(new Error('Compression failed')); return; }
+                        if (blob.size <= maxBytes || quality < 0.2) { resolve(blob); return; }
+                        quality -= 0.1;
+                        tryCompress();
+                    }, 'image/jpeg', quality);
+                };
+                tryCompress();
+            };
+            img.onerror = () => reject(new Error('Invalid image'));
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+async function uploadProfilePhoto(file) {
+    if (!appState.currentUser) return;
+    try {
+        const blob = await compressImage(file, CONFIG.MAX_PHOTO_BYTES);
+        const sb = getSB();
+        const path = `${appState.currentUser.phone}/avatar.jpg`;
+        const { error: upErr } = await sb.storage.from(CONFIG.PHOTO_BUCKET)
+            .upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+        if (upErr) { showToast('Photo upload failed', 'error'); return; }
+        const { data: urlData } = sb.storage.from(CONFIG.PHOTO_BUCKET).getPublicUrl(path);
+        const url = urlData.publicUrl + '?t=' + Date.now();
+        appState.currentUser.profilePhotoUrl = url;
+        const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
+        if (idx >= 0) appState.participants[idx].profilePhotoUrl = url;
+        await supabaseSaveProfile(appState.currentUser);
+        saveData();
+        renderProfilePhotoUI();
+        showToast('Profile photo updated! 📸', 'success');
+    } catch (err) {
+        showToast(err.message || 'Upload failed', 'error');
+    }
+}
+
+function renderProfilePhotoUI() {
+    const avatar = $('settings-avatar');
+    const url = appState.currentUser?.profilePhotoUrl;
+    if (avatar) {
+        if (url) {
+            avatar.style.backgroundImage = `url('${url}')`;
+            avatar.textContent = '';
+        } else {
+            avatar.style.backgroundImage = '';
+            avatar.textContent = (appState.currentUser?.name || '?').charAt(0).toUpperCase();
+        }
+    }
+}
+
+window.triggerPhotoUpload = function() { $('photo-file-input')?.click(); };
+window.onPhotoFileChange = async function(input) {
+    const file = input.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { showToast('Please select an image file', 'error'); return; }
+    showLoading();
+    await uploadProfilePhoto(file);
+    hideLoading();
+    input.value = '';
+};
 
 function loadData() {
     try {
@@ -847,13 +1022,20 @@ function showSettings() {
         $('settings-phone').value = appState.currentUser.phone;
         $('settings-goal').value = appState.currentUser.goal || '';
         $('settings-commitment').value = appState.currentUser.commitment || '';
-        // Load timezone setting
         const timezoneSelect = $('settings-timezone');
         if (timezoneSelect) {
             timezoneSelect.value = appState.currentUser.timezone || 'Asia/Kolkata';
         }
+        const weeklyGoalSelect = $('settings-weekly-goal');
+        if (weeklyGoalSelect) {
+            weeklyGoalSelect.value = appState.currentUser.weeklyGoal || '';
+        }
     }
+    _updateTeamDisplay();
+    renderProfilePhotoUI();
     $('info-participants').textContent = appState.participants.length;
+    const infoSeasonEl = $('info-season');
+    if (infoSeasonEl) infoSeasonEl.textContent = challengeSettings.seasonName;
 
     const adminBadge = $('admin-badge');
     if (adminBadge) {
@@ -1130,48 +1312,39 @@ async function handleLogin() {
 
     showLoading();
 
-    // Try cloud login first
-    if (CONFIG.USE_CLOUD_SYNC) {
-        const cloudResult = await cloudLogin(phone);
-
-        if (cloudResult.success && cloudResult.data) {
-            const user = cloudResult.data.user;
-            appState.currentUser = user;
-            appState.participants = cloudResult.data.participants || [];
-            appState.isAdmin = user.isAdmin || false;
-            appState.isSuperAdmin = user.isSuperAdmin || false;
-            appState.isFirstTime = false;
-            saveData();
-
-            hideLoading();
-            showToast('Welcome back, ' + user.name.split(' ')[0] + '!', 'success');
-            showTab('home');
-            window.scrollTo(0, 0);
-
-            // Check for milestones
-            const milestone = checkMilestone(user);
-            if (milestone) {
-                setTimeout(() => {
-                    const msg = getRandomQuote('milestone').replace('{count}', milestone);
-                    showToast(msg, 'success');
-                }, 2000);
-            }
-            setTimeout(checkForReminders, 3000);
-            return;
-        } else if (cloudResult.error && cloudResult.error.includes('not found')) {
-            // New user - go to registration
-            hideLoading();
-            showScreen('register-screen');
-            $('register-phone').value = phone;
-            $('register-password').value = password;
-            showToast('New user! Please complete registration.', '');
-            return;
-        }
-        // If cloud fails, fall back to local
+    const result = await supabaseLogin(phone);
+    if (result.success) {
+        const user = result.data.user;
+        appState.currentUser = user;
+        appState.participants = result.data.participants;
+        appState.isAdmin = user.isAdmin || false;
+        appState.isSuperAdmin = user.isSuperAdmin || false;
+        appState.isFirstTime = false;
+        saveData();
         hideLoading();
-        showToast('Could not connect. Try again.', 'error');
+        showToast('Welcome back, ' + user.name.split(' ')[0] + '!', 'success');
+        showTab('home');
+        window.scrollTo(0, 0);
+        subscribeRealtime();
+        const milestone = checkMilestone(user);
+        if (milestone) {
+            setTimeout(() => {
+                const msg = getRandomQuote('milestone').replace('{count}', milestone);
+                showToast(msg, 'success');
+            }, 2000);
+        }
+        setTimeout(checkForReminders, 3000);
+        return;
+    } else if (result.error === 'User not found') {
+        hideLoading();
+        showScreen('register-screen');
+        $('register-phone').value = phone;
+        $('register-password').value = password;
+        showToast('New user! Please complete registration.', '');
         return;
     }
+    hideLoading();
+    showToast('Could not connect. Check your connection and try again.', 'error');
 
     // Fallback to local login (if cloud sync disabled)
     const user = appState.participants.find(p => p.phone === phone);
@@ -1280,36 +1453,27 @@ async function handleUserRegistration() {
 
     showLoading();
 
-    // Register with cloud first
-    if (CONFIG.USE_CLOUD_SYNC) {
-        const cloudResult = await cloudRegister({
-            name: name,
-            phone: phone,
-            goal: goal,
-            commitment: commitment
-        });
+    const regResult = await supabaseRegister({ name, phone, goal, commitment });
+    if (!regResult.success) {
+        hideLoading();
+        showToast(regResult.error || 'Registration failed', 'error');
+        return;
+    }
 
-        if (cloudResult.success && cloudResult.data) {
-            // Now login to get all participants
-            const loginResult = await cloudLogin(phone);
-
-            if (loginResult.success) {
-                appState.currentUser = loginResult.data.user;
-                appState.participants = loginResult.data.participants || [];
-                appState.isFirstTime = false;
-                saveData();
-
-                hideLoading();
-                showToast('Welcome to the challenge, ' + name.split(' ')[0] + '! 💪', 'success');
-                showTab('home');
-                window.scrollTo(0, 0);
-                return;
-            }
-        } else if (cloudResult.error) {
-            hideLoading();
-            showToast(cloudResult.error, 'error');
-            return;
-        }
+    const loginResult = await supabaseLogin(phone);
+    if (loginResult.success) {
+        appState.currentUser = loginResult.data.user;
+        appState.participants = loginResult.data.participants;
+        appState.isFirstTime = false;
+        appState.isAdmin = appState.currentUser.isAdmin || false;
+        appState.isSuperAdmin = appState.currentUser.isSuperAdmin || false;
+        saveData();
+        hideLoading();
+        showToast('Welcome to the challenge, ' + name.split(' ')[0] + '! 💪', 'success');
+        showTab('home');
+        window.scrollTo(0, 0);
+        subscribeRealtime();
+        return;
     }
 
     // Fallback to local registration
@@ -1472,8 +1636,8 @@ function updateDashboard() {
     const currentDay = getCurrentDay();
     const daysLeft = getDaysLeft();
 
-    // Calculate total workouts early (needed for badge and stats)
-    const totalWorkouts = Object.values(user.checkins || {}).filter(v => v === 'Y').length;
+    // Calculate total workouts early (needed for badge and stats) — season-filtered
+    const totalWorkouts = calculateTotalWorkouts(user);
 
     // User name with admin badge
     const nameEl = $('user-name');
@@ -1536,13 +1700,17 @@ function updateDashboard() {
         } else if (streak > 0) {
             msgEl.textContent = "Great start! Keep it going!";
         } else {
-            msgEl.textContent = "Start your streak today!";
+            msgEl.textContent = "Log today and start your streak!";
         }
     }
 
     // Stats
     const totalEl = $('total-workouts');
     if (totalEl) totalEl.textContent = totalWorkouts;
+
+    // Best streak in the secondary stat card
+    const bsEl = $('best-streak-stat');
+    if (bsEl) bsEl.textContent = calculateBestStreak(user);
 
     const rate = currentDay > 0 ? Math.round((totalWorkouts / currentDay) * 100) : 0;
     const rateEl = $('completion-rate');
@@ -1594,6 +1762,9 @@ function updateDashboard() {
     // Personal progress section (replaces workouts needed)
     renderPersonalProgress(user);
 
+    // Weekly goal progress strip
+    renderWeeklyGoal();
+
     // Check-in status
     const todayDate = getTodayString();
     const todayCheckin = user.checkins ? user.checkins[todayDate] : null;
@@ -1613,7 +1784,179 @@ function updateDashboard() {
     // Show goal reminder occasionally
     showGoalReminder();
 
+    // Last season recap card
+    renderLastSeasonCard(user);
+
     saveData();
+}
+
+function renderLastSeasonCard(user) {
+    const el = $('last-season-card');
+    if (!el) return;
+    const ls = user && user.lastSeason;
+    if (!ls || ls.days === 0) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    el.innerHTML = `
+        <div class="ls-label">🏅 ${ls.season} Recap</div>
+        <div class="ls-stats">
+            <div class="ls-stat">
+                <span class="ls-num">${ls.days}</span>
+                <span class="ls-unit">days completed</span>
+            </div>
+            <div class="ls-divider"></div>
+            <div class="ls-stat">
+                <span class="ls-num">${ls.bestStreak}</span>
+                <span class="ls-unit">best streak 🔥</span>
+            </div>
+        </div>
+    `;
+}
+
+function renderWeeklyGoal() {
+    const container = $('weekly-goal-strip');
+    if (!container) return;
+    const user = appState.currentUser;
+    if (!user || !user.weeklyGoal) { container.style.display = 'none'; return; }
+
+    const goal = parseInt(user.weeklyGoal);
+    const thisWeek = calculateWeeklyImprovement(user).thisWeek;
+    const over = thisWeek >= goal;
+
+    const dots = Array.from({ length: goal }, (_, i) =>
+        `<span class="week-dot${i < thisWeek ? ' done' : ''}"></span>`
+    ).join('');
+
+    let msg;
+    if (thisWeek === 0) msg = `🎯 Goal: ${goal} workouts this week`;
+    else if (over) msg = `🔥 ${thisWeek}/${goal} — weekly goal crushed!`;
+    else msg = `💪 ${thisWeek} of ${goal} this week`;
+
+    container.style.display = 'block';
+    container.innerHTML = `<div class="weekly-goal-inner${over ? ' goal-done' : ''}">
+        <span class="weekly-goal-text">${msg}</span>
+        <div class="weekly-goal-dots">${dots}</div>
+    </div>`;
+}
+
+let _wdsDate = null;
+
+function _renderCustomTypeChips(selectedType) {
+    const container = $('wds-type-chips');
+    if (!container) return;
+    container.querySelectorAll('.wds-chip-custom').forEach(c => c.remove());
+    container.querySelectorAll('.wds-chip').forEach(c => c.classList.remove('selected'));
+    const addBtn = $('wds-add-type-btn');
+    const customTypes = appState.currentUser?.customWorkoutTypes || [];
+    customTypes.forEach(type => {
+        const btn = document.createElement('button');
+        btn.className = 'wds-chip wds-chip-custom';
+        btn.dataset.value = type;
+        btn.onclick = function() { selectWdsChip(this); };
+        btn.textContent = '💪 ' + type;
+        container.insertBefore(btn, addBtn);
+    });
+    if (selectedType) {
+        const tc = container.querySelector(`[data-value="${selectedType}"]`);
+        if (tc) tc.classList.add('selected');
+    }
+}
+
+function showWorkoutDetailsSheet(dateStr) {
+    _wdsDate = dateStr;
+    const existing = (appState.currentUser?.checkinDetails || {})[dateStr] || {};
+    _renderCustomTypeChips(existing.type);
+    document.querySelectorAll('#wds-mood-chips .wds-chip').forEach(c => c.classList.remove('selected'));
+    if (existing.mood) {
+        const mc = document.querySelector(`#wds-mood-chips [data-value="${existing.mood}"]`);
+        if (mc) mc.classList.add('selected');
+    }
+    const noteEl = $('wds-note');
+    if (noteEl) noteEl.value = existing.note || '';
+    const addBtn = $('wds-add-type-btn');
+    if (addBtn) addBtn.style.display = '';
+    const addRow = $('wds-add-type-row');
+    if (addRow) addRow.style.display = 'none';
+    const addField = $('wds-add-type-field');
+    if (addField) addField.value = '';
+    const sheet = $('workout-details-sheet');
+    if (sheet) {
+        sheet.style.display = 'flex';
+        requestAnimationFrame(() => sheet.classList.add('wds-visible'));
+    }
+}
+
+function startAddWorkoutType() {
+    const addBtn = $('wds-add-type-btn');
+    if (addBtn) addBtn.style.display = 'none';
+    const addRow = $('wds-add-type-row');
+    if (addRow) addRow.style.display = 'flex';
+    const addField = $('wds-add-type-field');
+    if (addField) { addField.value = ''; setTimeout(() => addField.focus(), 50); }
+}
+
+function cancelAddWorkoutType() {
+    const addBtn = $('wds-add-type-btn');
+    if (addBtn) addBtn.style.display = '';
+    const addRow = $('wds-add-type-row');
+    if (addRow) addRow.style.display = 'none';
+}
+
+function confirmAddWorkoutType() {
+    const addField = $('wds-add-type-field');
+    const name = (addField?.value || '').trim();
+    if (!name) { cancelAddWorkoutType(); return; }
+    if (!appState.currentUser.customWorkoutTypes) appState.currentUser.customWorkoutTypes = [];
+    if (!appState.currentUser.customWorkoutTypes.includes(name)) {
+        appState.currentUser.customWorkoutTypes.push(name);
+        const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
+        if (idx >= 0) appState.participants[idx].customWorkoutTypes = appState.currentUser.customWorkoutTypes;
+        saveData();
+    }
+    cancelAddWorkoutType();
+    _renderCustomTypeChips(name);
+}
+
+function dismissWorkoutDetails() {
+    const sheet = $('workout-details-sheet');
+    if (!sheet) return;
+    sheet.classList.remove('wds-visible');
+    setTimeout(() => { if (!sheet.classList.contains('wds-visible')) sheet.style.display = 'none'; }, 300);
+    _wdsDate = null;
+}
+
+function selectWdsChip(el) {
+    const container = el.closest('.wds-chips');
+    if (container) container.querySelectorAll('.wds-chip').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+}
+
+function saveWorkoutDetails() {
+    if (!_wdsDate || !appState.currentUser) { dismissWorkoutDetails(); return; }
+    const typeEl = document.querySelector('#wds-type-chips .wds-chip.selected');
+    const moodEl = document.querySelector('#wds-mood-chips .wds-chip.selected');
+    const note = ($('wds-note')?.value || '').trim();
+    if (!typeEl && !moodEl && !note) { dismissWorkoutDetails(); return; }
+
+    if (!appState.currentUser.checkinDetails) appState.currentUser.checkinDetails = {};
+    appState.currentUser.checkinDetails[_wdsDate] = {
+        type: typeEl?.dataset.value || null,
+        mood: moodEl?.dataset.value || null,
+        note: note || null
+    };
+    const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
+    if (idx >= 0) {
+        if (!appState.participants[idx].checkinDetails) appState.participants[idx].checkinDetails = {};
+        appState.participants[idx].checkinDetails[_wdsDate] = appState.currentUser.checkinDetails[_wdsDate];
+    }
+    saveData();
+    dismissWorkoutDetails();
+    showToast('Details saved! 📝', 'success');
+    if (appState.currentTab === 'calendar') renderCalendar();
+}
+
+function getWorkoutTypeIcon(type) {
+    const icons = { Strength: '🏋️', Cardio: '🏃', Yoga: '🧘', Sports: '⚽', 'Walk/Run': '🚶', Swimming: '🏊', Other: '🤸' };
+    return icons[type] || '💪';
 }
 
 function renderPersonalProgress(user) {
@@ -1629,15 +1972,15 @@ function renderPersonalProgress(user) {
     progressHtml += '<div class="progress-header">📈 Your Progress</div>';
     progressHtml += '<div class="progress-stats">';
 
-    // Current vs Best Streak
+    // This week vs streak (total days is now hero card)
     progressHtml += `
         <div class="progress-stat">
-            <span class="progress-value">${currentStreak}</span>
-            <span class="progress-label">Current Streak</span>
+            <span class="progress-value">${weeklyStats.thisWeek}</span>
+            <span class="progress-label">This Week 💪</span>
         </div>
         <div class="progress-stat">
-            <span class="progress-value">${bestStreak}</span>
-            <span class="progress-label">Best Streak</span>
+            <span class="progress-value">${currentStreak}</span>
+            <span class="progress-label">🔥 Streak</span>
         </div>
     `;
 
@@ -1706,7 +2049,12 @@ function calculateStreak(user) {
 function calculateTotalWorkouts(user) {
     // If no checkins available, use pre-computed value from API
     if (!user.checkins) return user.totalWorkouts || 0;
-    return Object.values(user.checkins).filter(v => v === 'Y').length;
+    // Only count workouts within the current challenge period
+    const start = challengeSettings.startDate;
+    const end = challengeSettings.endDate;
+    return Object.entries(user.checkins)
+        .filter(([date, v]) => v === 'Y' && date >= start && date <= end)
+        .length;
 }
 
 function calculateWeeklyWorkouts(user) {
@@ -1792,14 +2140,10 @@ async function submitCheckin(status, dateStr = null) {
 
     saveData();
 
-    // Sync to cloud
-    if (CONFIG.USE_CLOUD_SYNC) {
-        cloudCheckin(appState.currentUser.phone, targetDate, status).then(result => {
-            if (!result.success) {
-                console.error('Cloud sync failed:', result.error);
-            }
-        });
-    }
+    // Sync checkin to Supabase
+    supabaseCheckin(appState.currentUser.phone, targetDate, status).catch(e => {
+        console.error('Checkin sync failed:', e);
+    });
 
     if (!dateStr) {
         showCelebration(status);
@@ -1807,6 +2151,7 @@ async function submitCheckin(status, dateStr = null) {
 
     if (status === 'Y') {
         setTimeout(() => checkCenturyClubUnlock(), 600);
+        setTimeout(() => showWorkoutDetailsSheet(targetDate), 1400);
     }
 
     setTimeout(() => {
@@ -1842,28 +2187,10 @@ async function undoCheckin() {
     // Remove from local state
     delete appState.currentUser.checkins[today];
 
-    // Sync with cloud - delete from Google Sheets
-    if (CONFIG.USE_CLOUD_SYNC) {
-        try {
-            const response = await fetch(CONFIG.API_URL, {
-                method: 'POST',
-                mode: 'cors',
-                headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify({
-                    action: 'deleteCheckin',
-                    phone: appState.currentUser.phone,
-                    date: today
-                })
-            });
-            const result = await response.json();
-            console.log('Delete checkin result:', result);
-            if (!result.success) {
-                console.error('Failed to delete from cloud:', result.error);
-            }
-        } catch (error) {
-            console.error('Cloud sync failed for undo:', error);
-        }
-    }
+    // Delete today's checkin from Supabase
+    getSB().from('checkins').delete()
+        .eq('phone', appState.currentUser.phone).eq('date', today)
+        .then(({ error }) => { if (error) console.error('Delete checkin failed:', error); });
 
     // Save locally
     saveData();
@@ -2051,6 +2378,15 @@ function renderLeaderboard(category = 'thisWeek') {
         btn.classList.toggle('active', btn.dataset.category === category);
     });
 
+    if (category === 'teams') {
+        const categoryTitle = $('category-title');
+        const categoryDesc = $('category-desc');
+        if (categoryTitle) categoryTitle.textContent = '👥 Team Battle';
+        if (categoryDesc) categoryDesc.textContent = 'Set your team in Settings to join the group board';
+        renderTeamsLeaderboard();
+        return;
+    }
+
     const sorted = getSortedParticipants(category);
     const currentDay = getCurrentDay();
 
@@ -2133,7 +2469,7 @@ function renderLeaderboard(category = 'thisWeek') {
             html += `
                 <tr class="${isMe ? 'lb-row-me' : ''}">
                     <td class="lb-td-rank">${rankDisplay}</td>
-                    <td class="lb-td-name">${p.name}${isMe ? ' (You)' : ''}</td>
+                    <td class="lb-td-name">${_avatarHtml(p)}${p.name}${isMe ? ' (You)' : ''}</td>
                     <td class="lb-td-stat lb-td-primary">${primaryValue}</td>
                     <td class="lb-td-stat">${p.totalWorkouts}</td>
                     <td class="lb-td-stat">${rate}%</td>
@@ -2154,6 +2490,220 @@ function renderLeaderboard(category = 'thisWeek') {
 
         list.innerHTML = html || '<p class="empty-message">No participants yet</p>';
     }
+}
+
+// ============================================
+// TEAM PICKER
+// ============================================
+let _tpsViewingTeam = null;
+
+function _avatarHtml(p, size) {
+    const s = size || 32;
+    const initial = _htmlEsc((p.name || '?').charAt(0).toUpperCase());
+    if (p.profilePhotoUrl) {
+        return `<span class="lb-avatar" style="width:${s}px;height:${s}px;background-image:url('${p.profilePhotoUrl}');"></span>`;
+    }
+    return `<span class="lb-avatar" style="width:${s}px;height:${s}px;">${initial}</span>`;
+}
+
+function _htmlEsc(str) {
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function showTeamPicker() {
+    const sheet = $('team-picker-sheet');
+    if (!sheet) return;
+    sheet.style.display = 'flex';
+    requestAnimationFrame(() => sheet.classList.add('tps-visible'));
+    showTeamList();
+}
+
+function hideTeamPicker() {
+    const sheet = $('team-picker-sheet');
+    if (!sheet) return;
+    sheet.classList.remove('tps-visible');
+    setTimeout(() => { if (!sheet.classList.contains('tps-visible')) sheet.style.display = 'none'; }, 300);
+}
+
+function _tpsSetHeader(showBack, title) {
+    const backBtn = $('tps-back-btn');
+    if (backBtn) backBtn.style.visibility = showBack ? 'visible' : 'hidden';
+    const titleEl = $('tps-title');
+    if (titleEl) titleEl.textContent = title;
+}
+
+function showTeamList() {
+    _tpsSetHeader(false, 'Join a Team');
+    const enriched = getSortedParticipants('all');
+    const teamsMap = {};
+    enriched.forEach(p => {
+        const name = (p.teamName || '').trim();
+        if (!name) return;
+        const key = name.toLowerCase();
+        if (!teamsMap[key]) teamsMap[key] = { name, members: [] };
+        teamsMap[key].members.push(p);
+    });
+    const teams = Object.values(teamsMap).sort((a, b) => b.members.length - a.members.length);
+    const myKey = (appState.currentUser?.teamName || '').trim().toLowerCase();
+
+    const body = $('tps-body');
+    if (!body) return;
+    let html = '';
+
+    if (teams.length > 0) {
+        html += '<div class="tps-section-label">Existing teams</div>';
+        teams.forEach(team => {
+            const isMyTeam = myKey && team.name.toLowerCase() === myKey;
+            const preview = team.members.map(m => m.name.split(' ')[0]).slice(0, 4).join(', ') + (team.members.length > 4 ? '…' : '');
+            html += `
+                <div class="tps-team-card${isMyTeam ? ' tps-team-card-joined' : ''}" data-team="${_htmlEsc(team.name)}" onclick="showTeamDetail(this.dataset.team)">
+                    <div class="tps-team-card-info">
+                        <div class="tps-team-card-name">${_htmlEsc(team.name)}</div>
+                        <div class="tps-team-card-members">${team.members.length} member${team.members.length > 1 ? 's' : ''} · ${_htmlEsc(preview)}</div>
+                    </div>
+                    <div class="tps-team-card-right">
+                        ${isMyTeam ? '<span class="tps-badge-joined">Joined ✓</span>' : ''}
+                        <span class="tps-chevron">›</span>
+                    </div>
+                </div>`;
+        });
+        html += '<div class="tps-divider"></div>';
+    }
+
+    html += `<button class="tps-create-btn" onclick="showCreateTeam()">＋ Create a new team</button>`;
+    if (myKey) html += `<button class="tps-leave-btn" onclick="leaveTeam()">Leave current team</button>`;
+    body.innerHTML = html;
+}
+
+function showTeamDetail(teamName) {
+    _tpsViewingTeam = teamName;
+    _tpsSetHeader(true, teamName);
+    const enriched = getSortedParticipants('all');
+    const members = enriched.filter(p => (p.teamName || '').trim().toLowerCase() === teamName.toLowerCase());
+    const myKey = (appState.currentUser?.teamName || '').trim().toLowerCase();
+    const isMyTeam = myKey === teamName.toLowerCase();
+
+    const body = $('tps-body');
+    if (!body) return;
+    let html = `<div class="tps-member-list">`;
+    members.sort((a, b) => b.totalWorkouts - a.totalWorkouts).forEach(m => {
+        const isMe = isCurrentUser(m);
+        html += `
+            <div class="tps-member-row${isMe ? ' tps-member-me' : ''}">
+                <div class="tps-member-avatar" style="${m.profilePhotoUrl ? `background-image:url('${m.profilePhotoUrl}');` : ''}">${m.profilePhotoUrl ? '' : _htmlEsc((m.name || '?').charAt(0).toUpperCase())}</div>
+                <div class="tps-member-name">${_htmlEsc(m.name)}${isMe ? ' <span class="tps-you-tag">(You)</span>' : ''}</div>
+                <div class="tps-member-stat">${m.totalWorkouts} days</div>
+            </div>`;
+    });
+    html += `</div>`;
+
+    if (isMyTeam) {
+        html += `<button class="tps-leave-btn tps-leave-btn-full" onclick="leaveTeam()">Leave this team</button>`;
+    } else {
+        html += `<button class="tps-join-btn" data-team="${_htmlEsc(teamName)}" onclick="joinTeam(this.dataset.team)">Join ${_htmlEsc(teamName)} 👥</button>`;
+    }
+    body.innerHTML = html;
+}
+
+function showCreateTeam() {
+    _tpsSetHeader(true, 'Create a Team');
+    const body = $('tps-body');
+    if (!body) return;
+    body.innerHTML = `
+        <div class="tps-create-form">
+            <p class="tps-create-hint">Give your team a name. Anyone who types the exact same name will join your team automatically.</p>
+            <input id="tps-new-name" class="tps-new-team-input" type="text" placeholder="e.g. Alpha Squad" maxlength="30"
+                onkeydown="if(event.key==='Enter')confirmCreateTeam();" />
+            <button class="tps-join-btn" onclick="confirmCreateTeam()">Create & Join</button>
+        </div>`;
+    setTimeout(() => $('tps-new-name')?.focus(), 80);
+}
+
+function confirmCreateTeam() {
+    const name = ($('tps-new-name')?.value || '').trim();
+    if (!name) { showToast('Enter a team name', 'error'); return; }
+    joinTeam(name);
+}
+
+function joinTeam(teamName) {
+    if (!appState.currentUser) return;
+    appState.currentUser.teamName = teamName;
+    const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
+    if (idx >= 0) appState.participants[idx].teamName = teamName;
+    saveData();
+    _updateTeamDisplay();
+    hideTeamPicker();
+    showToast(`Joined "${teamName}" 👥`, 'success');
+}
+
+function leaveTeam() {
+    if (!appState.currentUser) return;
+    const prev = appState.currentUser.teamName;
+    appState.currentUser.teamName = null;
+    const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
+    if (idx >= 0) appState.participants[idx].teamName = null;
+    saveData();
+    _updateTeamDisplay();
+    hideTeamPicker();
+    showToast(`Left team "${prev}"`, 'success');
+}
+
+function _updateTeamDisplay() {
+    const el = $('settings-team-display');
+    if (el) el.textContent = appState.currentUser?.teamName || 'No team';
+}
+
+function renderTeamsLeaderboard() {
+    const podium = $('podium');
+    if (podium) podium.innerHTML = '';
+    const list = $('leaderboard-list');
+    if (!list) return;
+
+    const enriched = getSortedParticipants('all');
+    const teamsMap = {};
+    enriched.forEach(p => {
+        const name = (p.teamName || '').trim();
+        if (!name) return;
+        const key = name.toLowerCase();
+        if (!teamsMap[key]) teamsMap[key] = { name, members: [], total: 0, thisWeek: 0 };
+        teamsMap[key].members.push(p);
+        teamsMap[key].total += p.totalWorkouts || 0;
+        teamsMap[key].thisWeek += p.weeklyWorkouts || 0;
+    });
+
+    const teams = Object.values(teamsMap).sort((a, b) => b.total - a.total || b.thisWeek - a.thisWeek);
+    const myKey = (appState.currentUser?.teamName || '').trim().toLowerCase();
+
+    if (teams.length === 0) {
+        list.innerHTML = `
+            <div class="lb-empty-state">
+                <span class="lb-empty-icon">👥</span>
+                <p>No teams yet!</p>
+                <p class="lb-empty-hint">Set a team name in Settings to form a team with others who share the same name.</p>
+            </div>`;
+        return;
+    }
+
+    const medals = ['🥇', '🥈', '🥉'];
+    let html = '';
+    teams.forEach((team, i) => {
+        const isMyTeam = myKey && team.name.toLowerCase() === myKey;
+        const rankDisplay = i < 3 ? medals[i] : `#${i + 1}`;
+        const firstNames = team.members.map(m => m.name.split(' ')[0]).join(', ');
+        html += `
+            <div class="lb-team-card${isMyTeam ? ' lb-team-card-me' : ''}">
+                <div class="lb-team-rank">${rankDisplay}</div>
+                <div class="lb-team-info">
+                    <div class="lb-team-name">${team.name}${isMyTeam ? ' 👈' : ''}</div>
+                    <div class="lb-team-members">${team.members.length} member${team.members.length > 1 ? 's' : ''} · ${firstNames}</div>
+                </div>
+                <div class="lb-team-stats">
+                    <div><span class="lb-team-stat-val">${team.total}</span> <span class="lb-team-stat-lbl">days</span></div>
+                    <div><span class="lb-team-stat-val lb-team-week">${team.thisWeek}</span> <span class="lb-team-stat-lbl">this wk</span></div>
+                </div>
+            </div>`;
+    });
+    list.innerHTML = html;
 }
 
 // Toggle leaderboard expand/collapse
@@ -2383,19 +2933,18 @@ async function viewParticipantCalendar(identifier) {
     // Load checkins on-demand if not available (API no longer sends checkins for other users)
     const isMe = isCurrentUser(participant);
 
-    if (!participant.checkins && !isMe && CONFIG.USE_CLOUD_SYNC) {
+    // Load checkins on-demand from Supabase if not available
+    if (!participant.checkins && !isMe) {
         try {
-            const result = await apiCall('getParticipantCheckins', {
-                phone: appState.currentUser.phone,
-                targetId: participant.id || '',
-                targetPhone: participant.phone || ''
-            });
-            if (result.success && result.data) {
-                participant.checkins = result.data.checkins;
+            const { data } = await getSB().from('checkins').select('date,status')
+                .eq('phone', participant.phone)
+                .gte('date', challengeSettings.startDate)
+                .lte('date', challengeSettings.endDate);
+            if (data) {
+                participant.checkins = {};
+                data.forEach(c => { participant.checkins[c.date] = c.status; });
             }
-        } catch (e) {
-            console.log('Failed to load participant checkins:', e);
-        }
+        } catch (e) { console.log('Failed to load participant checkins:', e); }
     }
 
     // Calculate stats
@@ -2715,11 +3264,13 @@ function renderCalendar() {
             // Make days clickable if within edit window (for adding, editing, or deleting)
             const clickable = canEdit ? 'clickable' : '';
             const onClick = clickable ? `onclick="openDayEditor('${dateStr}', '${checkin || ''}')"` : '';
+            const details = checkin === 'Y' ? ((user.checkinDetails || {})[dateStr] || null) : null;
+            const detailBadge = details?.type ? `<span class="cal-detail-icon" title="${details.type}">${getWorkoutTypeIcon(details.type)}</span>` : '';
 
             html += `
-                <div class="cal-day ${statusClass} ${clickable}" ${onClick} title="Day ${i + 1} - ${formatShortDate(date)}">
+                <div class="cal-day ${statusClass} ${clickable}" ${onClick} title="Day ${i + 1} - ${formatShortDate(date)}${details ? ' — ' + details.type : ''}">
                     <span class="cal-date">${date.getDate()}</span>
-                    <span class="cal-day-num">D${i + 1}</span>
+                    ${detailBadge}
                 </div>
             `;
         });
@@ -2833,28 +3384,9 @@ async function quickLogDelete() {
         delete appState.currentUser.checkins[dateStr];
     }
 
-    // Sync with cloud
-    if (CONFIG.USE_CLOUD_SYNC) {
-        try {
-            const response = await fetch(CONFIG.API_URL, {
-                method: 'POST',
-                mode: 'cors',
-                headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify({
-                    action: 'deleteCheckin',
-                    phone: appState.currentUser.phone,
-                    date: dateStr
-                })
-            });
-            const result = await response.json();
-            console.log('Delete checkin result:', result);
-            if (!result.success) {
-                console.error('Failed to delete from cloud:', result.error);
-            }
-        } catch (error) {
-            console.error('Cloud sync failed for delete:', error);
-        }
-    }
+    getSB().from('checkins').delete()
+        .eq('phone', appState.currentUser.phone).eq('date', dateStr)
+        .then(({ error }) => { if (error) console.error('Delete checkin failed:', error); });
 
     saveData();
     renderCalendar();
@@ -3724,7 +4256,8 @@ function saveSettings() {
     const goal = $('settings-goal').value.trim();
     const commitment = $('settings-commitment').value.trim();
     const timezone = $('settings-timezone') ? $('settings-timezone').value : 'Asia/Kolkata';
-
+    const weeklyGoalRaw = $('settings-weekly-goal') ? $('settings-weekly-goal').value : '';
+    const weeklyGoal = weeklyGoalRaw ? parseInt(weeklyGoalRaw) : null;
     if (!name) {
         showToast('Name cannot be empty', 'error');
         return;
@@ -3734,6 +4267,7 @@ function saveSettings() {
     appState.currentUser.goal = goal;
     appState.currentUser.commitment = commitment;
     appState.currentUser.timezone = timezone;
+    appState.currentUser.weeklyGoal = weeklyGoal;
 
     const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
     if (idx >= 0) {
@@ -3741,6 +4275,7 @@ function saveSettings() {
         appState.participants[idx].goal = goal;
         appState.participants[idx].commitment = commitment;
         appState.participants[idx].timezone = timezone;
+        appState.participants[idx].weeklyGoal = weeklyGoal;
     }
 
     saveData();
@@ -3753,7 +4288,24 @@ function saveSettings() {
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
     loadData();
-    cleanupDemoData(); // Clean up any old demo/test data
+    cleanupDemoData();
+    // If already logged in from localStorage cache, refresh from Supabase in background
+    if (appState.currentUser?.phone) {
+        subscribeRealtime();
+        supabaseLogin(appState.currentUser.phone).then(result => {
+            if (result.success) {
+                const remote = result.data.user;
+                // Preserve local checkins that haven't synced yet
+                const merged = { ...(remote.checkins || {}), ...(appState.currentUser.checkins || {}) };
+                remote.checkins = merged;
+                appState.currentUser = remote;
+                appState.participants = result.data.participants;
+                appState.participants.forEach(p => { if (p.phone === remote.phone) p.checkins = merged; });
+                saveData();
+                updateDashboard();
+            }
+        }).catch(() => {});
+    }
 
     initOnboarding();
     initLogin();
@@ -3948,6 +4500,21 @@ window.quickLogFromCalendar = quickLogFromCalendar;
 window.quickLogSubmit = quickLogSubmit;
 window.quickLogDelete = quickLogDelete;
 window.openDayEditor = openDayEditor;
+window.showWorkoutDetailsSheet = showWorkoutDetailsSheet;
+window.startAddWorkoutType = startAddWorkoutType;
+window.cancelAddWorkoutType = cancelAddWorkoutType;
+window.confirmAddWorkoutType = confirmAddWorkoutType;
+window.showTeamPicker = showTeamPicker;
+window.hideTeamPicker = hideTeamPicker;
+window.showTeamList = showTeamList;
+window.showTeamDetail = showTeamDetail;
+window.showCreateTeam = showCreateTeam;
+window.confirmCreateTeam = confirmCreateTeam;
+window.joinTeam = joinTeam;
+window.leaveTeam = leaveTeam;
+window.dismissWorkoutDetails = dismissWorkoutDetails;
+window.selectWdsChip = selectWdsChip;
+window.saveWorkoutDetails = saveWorkoutDetails;
 window.handleReminderAction = handleReminderAction;
 window.enableReminders = enableReminders;
 window.dismissGoalReminder = dismissGoalReminder;

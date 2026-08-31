@@ -192,6 +192,9 @@
             <!-- Century Club banner (only for 100-day completers who haven't shared yet) -->
             <div id="century-banner" class="century-banner" style="display: none;" onclick="openCardBuilder()"></div>
 
+            <!-- Weekly Goal Progress (shows when goal is set) -->
+            <div id="weekly-goal-strip" class="weekly-goal-strip" style="display:none;"></div>
+
             <!-- Goal Reminder (shows occasionally) -->
             <div id="goal-reminder" class="goal-reminder" style="display: none;">
                 <!-- Dynamically rendered -->
@@ -203,13 +206,19 @@
                 <p id="motivation-text">"Success is the sum of small efforts repeated day in and day out."</p>
             </div>
 
-            <!-- Streak Card -->
+            <!-- Days Completed Hero Card (primary metric) -->
             <div class="streak-card clickable-card" id="streak-card" onclick="showTab('calendar')">
                 <div class="streak-flames" id="streak-flames"></div>
-                <div class="streak-number" id="streak-count">0</div>
-                <div class="streak-label">Day Streak</div>
-                <div class="streak-message" id="streak-message">Start your streak today!</div>
+                <div class="streak-number" id="total-workouts">0</div>
+                <div class="streak-label">Days Completed 💪</div>
+                <div class="streak-secondary" id="streak-secondary">
+                    <span id="streak-badge">🔥 <span id="streak-count">0</span> day streak</span>
+                </div>
+                <div class="streak-message" id="streak-message">Let's get moving!</div>
             </div>
+
+            <!-- Last Season Recap (hidden until S6 data loaded) -->
+            <div id="last-season-card" class="last-season-card" style="display:none;"></div>
 
             <!-- Today's Check-in -->
             <div class="checkin-section" id="checkin-section">
@@ -255,9 +264,9 @@
 
             <!-- Stats Cards -->
             <div class="stats-grid">
-                <div class="stat-card clickable-card" onclick="showTab('calendar')">
-                    <div class="stat-value" id="total-workouts">0</div>
-                    <div class="stat-label">Total Workouts</div>
+                <div class="stat-card">
+                    <div class="stat-value" id="best-streak-stat">0</div>
+                    <div class="stat-label">Best Streak 🏅</div>
                 </div>
                 <div class="stat-card clickable-card" onclick="showTab('summary')">
                     <div class="stat-value" id="completion-rate">0%</div>
@@ -309,6 +318,7 @@
                 <button class="lb-filter-btn active" data-category="thisWeek">This Week</button>
                 <button class="lb-filter-btn" data-category="comeback">Comeback</button>
                 <button class="lb-filter-btn" data-category="streaks">Streaks</button>
+                <button class="lb-filter-btn" data-category="teams">👥 Teams</button>
             </div>
 
             <!-- Category Description -->
@@ -532,6 +542,15 @@
                     <span id="admin-badge" class="admin-badge" style="display:none;">Admin</span>
                     <span id="super-admin-badge" class="super-admin-badge" style="display:none;">👑 Super Admin</span>
                 </h3>
+                <div class="settings-photo-row">
+                    <div class="settings-avatar" id="settings-avatar" onclick="triggerPhotoUpload()"></div>
+                    <div class="settings-photo-info">
+                        <p class="settings-photo-label">Profile Photo</p>
+                        <button class="settings-photo-btn" onclick="triggerPhotoUpload()">Upload Photo</button>
+                        <p class="settings-hint">Images only · Max 200KB after compression</p>
+                    </div>
+                    <input type="file" id="photo-file-input" accept="image/*" style="display:none;" onchange="onPhotoFileChange(this)">
+                </div>
                 <div class="settings-item">
                     <label>Name</label>
                     <input type="text" id="settings-name" class="settings-input">
@@ -547,6 +566,25 @@
                 <div class="settings-item">
                     <label>Daily Commitment</label>
                     <input type="text" id="settings-commitment" class="settings-input" placeholder="Your daily commitment">
+                </div>
+                <div class="settings-item">
+                    <label>Weekly Workout Goal</label>
+                    <select id="settings-weekly-goal" class="settings-input">
+                        <option value="">No goal set</option>
+                        <option value="2">2 days / week</option>
+                        <option value="3">3 days / week</option>
+                        <option value="4">4 days / week</option>
+                        <option value="5">5 days / week</option>
+                        <option value="6">6 days / week</option>
+                        <option value="7">Every day</option>
+                    </select>
+                </div>
+                <div class="settings-item settings-team-item">
+                    <label>Team</label>
+                    <button class="settings-team-btn" onclick="showTeamPicker()">
+                        <span id="settings-team-display">No team</span>
+                        <span class="settings-team-chevron">›</span>
+                    </button>
                 </div>
                 <div class="settings-item settings-item-timezone">
                     <label>Your Timezone</label>
@@ -967,6 +1005,64 @@
         </div>
     </nav>
 
+    <!-- Team Picker Sheet -->
+    <div id="team-picker-sheet" class="team-picker-sheet" style="display:none;">
+        <div class="tps-backdrop" onclick="hideTeamPicker()"></div>
+        <div class="tps-content">
+            <div class="tps-header">
+                <button class="tps-back" id="tps-back-btn" onclick="showTeamList()" style="visibility:hidden;">←</button>
+                <h3 id="tps-title">Join a Team</h3>
+                <button class="tps-close" onclick="hideTeamPicker()">✕</button>
+            </div>
+            <div id="tps-body" class="tps-body"></div>
+        </div>
+    </div>
+
+    <!-- Workout Details Sheet (slides up after logging a workout) -->
+    <div id="workout-details-sheet" class="workout-details-sheet" style="display:none;">
+        <div class="wds-backdrop" onclick="dismissWorkoutDetails()"></div>
+        <div class="wds-content">
+            <div class="wds-header">
+                <div>
+                    <h3>Nice work! 🎉</h3>
+                    <p class="wds-sub">Quick details? (optional)</p>
+                </div>
+                <button class="wds-skip" onclick="dismissWorkoutDetails()">Skip</button>
+            </div>
+            <div class="wds-section">
+                <p class="wds-label">What did you do?</p>
+                <div class="wds-chips" id="wds-type-chips">
+                    <button class="wds-chip" data-value="Strength" onclick="selectWdsChip(this)">🏋️ Strength</button>
+                    <button class="wds-chip" data-value="Cardio" onclick="selectWdsChip(this)">🏃 Cardio</button>
+                    <button class="wds-chip" data-value="Yoga" onclick="selectWdsChip(this)">🧘 Yoga</button>
+                    <button class="wds-chip" data-value="Sports" onclick="selectWdsChip(this)">⚽ Sports</button>
+                    <button class="wds-chip" data-value="Walk/Run" onclick="selectWdsChip(this)">🚶 Walk/Run</button>
+                    <button class="wds-chip" data-value="Swimming" onclick="selectWdsChip(this)">🏊 Swim</button>
+                    <button class="wds-chip" data-value="Other" onclick="selectWdsChip(this)">🤸 Other</button>
+                    <button class="wds-chip wds-chip-add" id="wds-add-type-btn" onclick="startAddWorkoutType()">＋ Add</button>
+                </div>
+                <div id="wds-add-type-row" class="wds-add-type-row" style="display:none;">
+                    <input id="wds-add-type-field" class="wds-add-type-field" type="text" placeholder="e.g. Pilates" maxlength="20" onkeydown="if(event.key==='Enter')confirmAddWorkoutType();else if(event.key==='Escape')cancelAddWorkoutType();" />
+                    <button class="wds-chip wds-chip-confirm" onclick="confirmAddWorkoutType()">✓</button>
+                    <button class="wds-chip wds-chip-cancel" onclick="cancelAddWorkoutType()">✕</button>
+                </div>
+            </div>
+            <div class="wds-section">
+                <p class="wds-label">How did it feel?</p>
+                <div class="wds-chips" id="wds-mood-chips">
+                    <button class="wds-chip" data-value="Crushed it" onclick="selectWdsChip(this)">💪 Crushed it</button>
+                    <button class="wds-chip" data-value="Great" onclick="selectWdsChip(this)">😊 Great</button>
+                    <button class="wds-chip" data-value="OK" onclick="selectWdsChip(this)">😐 OK</button>
+                    <button class="wds-chip" data-value="Tough" onclick="selectWdsChip(this)">😩 Tough</button>
+                </div>
+            </div>
+            <div class="wds-section">
+                <textarea id="wds-note" class="wds-note" placeholder="Add a quick note... (optional)" rows="2"></textarea>
+            </div>
+            <button class="btn-primary wds-save" onclick="saveWorkoutDetails()">Save Details</button>
+        </div>
+    </div>
+
     <!-- Loading Overlay -->
     <div id="loading" class="loading-overlay">
         <div class="loader"></div>
@@ -976,6 +1072,7 @@
     <!-- Toast Notification -->
     <div id="toast" class="toast"></div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
