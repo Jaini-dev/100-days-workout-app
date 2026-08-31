@@ -3164,6 +3164,14 @@ body.modal-open .hamburger-btn { display: none; }
     box-shadow: var(--shadow-sm);
     animation: fadeIn 0.5s ease;
 }
+[data-theme="dark"] .goal-reminder {
+    background: linear-gradient(135deg, #2d1b00 0%, #3d2400 100%);
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .goal-reminder {
+        background: linear-gradient(135deg, #2d1b00 0%, #3d2400 100%);
+    }
+}
 
 .goal-reminder-header {
     display: flex;
@@ -3188,9 +3196,15 @@ body.modal-open .hamburger-btn { display: none; }
     border-radius: 12px;
     margin-bottom: 12px;
 }
-[data-theme="dark"] .goal-reminder-content { background: rgba(0,0,0,0.3); }
+[data-theme="dark"] .goal-reminder-content { background: rgba(0,0,0,0.35); }
+[data-theme="dark"] .goal-reminder-content p,
+[data-theme="dark"] .goal-reminder-title,
+[data-theme="dark"] .goal-reminder-text { color: #fde68a; }
 @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) .goal-reminder-content { background: rgba(0,0,0,0.3); }
+    :root:not([data-theme="light"]) .goal-reminder-content { background: rgba(0,0,0,0.35); }
+    :root:not([data-theme="light"]) .goal-reminder-content p,
+    :root:not([data-theme="light"]) .goal-reminder-title,
+    :root:not([data-theme="light"]) .goal-reminder-text { color: #fde68a; }
 }
 
 .goal-reminder-label {
@@ -3206,6 +3220,33 @@ body.modal-open .hamburger-btn { display: none; }
     font-weight: 600;
     color: var(--gray-800);
     margin-bottom: 12px;
+}
+
+.goal-icon {
+    font-size: 28px;
+    display: block;
+    margin-bottom: 8px;
+}
+.goal-reminder-content p {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--gray-800);
+    margin-bottom: 12px;
+    line-height: 1.5;
+}
+.goal-dismiss {
+    background: none;
+    border: 1px solid rgba(0,0,0,0.2);
+    border-radius: 20px;
+    padding: 6px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-700);
+    cursor: pointer;
+}
+[data-theme="dark"] .goal-dismiss { border-color: rgba(253,230,138,0.4); color: #fde68a; }
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .goal-dismiss { border-color: rgba(253,230,138,0.4); color: #fde68a; }
 }
 
 .goal-reminder-dismiss {

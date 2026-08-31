@@ -2319,7 +2319,7 @@ function calculateStreak(user) {
     if (!user.checkins) return user.streak || 0;
 
     let streak = 0;
-    // Use the participant's timezone for calculating their streak
+    const seasonStart = challengeSettings.startDate;
     const timezone = user?.timezone || 'Asia/Kolkata';
     const today = getDateInTimezone(timezone);
     today.setHours(0, 0, 0, 0);
@@ -2328,17 +2328,18 @@ function calculateStreak(user) {
         const checkDate = new Date(today);
         checkDate.setDate(checkDate.getDate() - i);
         const dateStr = getDateString(checkDate);
+
+        // Don't count days before season started
+        if (dateStr < seasonStart) break;
+
         const checkin = user.checkins[dateStr];
 
         if (checkin === 'Y') {
-            // Only actual workouts count towards streak
             streak++;
         } else if (checkin === 'R') {
-            // Rest days don't count towards streak, but don't break it either
-            // (skip this day and continue checking)
+            // Rest days don't break the streak but don't add to it
             continue;
         } else if (checkin === 'N') {
-            // Skipped day breaks the streak
             break;
         } else if (i > 0) {
             // No checkin for a past day breaks streak
