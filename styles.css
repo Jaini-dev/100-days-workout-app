@@ -763,9 +763,15 @@ body {
     color: white;
 }
 
+.checkin-btn.rest {
+    background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+    color: white;
+}
+
 .checkin-btn.no {
-    background: var(--bg-page);
-    color: var(--gray-600);
+    background: var(--bg-subtle);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
 }
 
 .checkin-btn:hover {
@@ -3483,9 +3489,15 @@ body.modal-open .hamburger-btn { display: none; }
     color: white;
 }
 
+.quick-log-btn.rest {
+    background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+    color: white;
+}
+
 .quick-log-btn.no {
-    background: var(--bg-page);
-    color: var(--gray-600);
+    background: var(--bg-subtle);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
 }
 
 .quick-log-btn:hover {
@@ -6400,9 +6412,9 @@ body.modal-open {
 .ql-details {
     margin: 12px 0 8px;
     padding: 12px;
-    background: var(--gray-50, #f9fafb);
+    background: var(--bg-subtle);
     border-radius: 12px;
-    border: 1px solid var(--gray-200, #e5e7eb);
+    border: 1px solid var(--border-color);
     text-align: left;
 }
 .ql-photo-wrap {
@@ -6423,12 +6435,13 @@ body.modal-open {
     margin-bottom: 10px;
 }
 .ql-tag {
-    background: var(--primary-light, #e0e7ff);
-    color: var(--primary, #4f46e5);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
     border-radius: 20px;
-    padding: 4px 10px;
+    padding: 5px 12px;
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 600;
 }
 .ql-edit-btn {
     background: none;
