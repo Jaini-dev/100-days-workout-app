@@ -6417,25 +6417,30 @@ body.modal-open {
     border: 1px solid var(--border-color);
     text-align: left;
 }
+.ql-recap-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 12px;
+}
 .ql-photo-wrap {
-    margin-bottom: 10px;
+    flex-shrink: 0;
 }
 .ql-photo {
-    display: block;
-    width: 100%;
-    max-width: 240px;
-    aspect-ratio: 1 / 1;
-    margin: 0 auto;
+    width: 96px;
+    height: 96px;
     border-radius: 12px;
     background-size: cover;
     background-position: center;
     background-color: var(--bg-subtle);
 }
 .ql-meta {
+    flex: 1;
+    min-width: 0;
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-    margin-bottom: 10px;
+    align-content: flex-start;
 }
 .ql-tag {
     background: var(--bg-card);
