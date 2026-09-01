@@ -3013,6 +3013,7 @@ function joinTeam(teamName) {
         window._teamPickerCallback = null;
     } else {
         _updateTeamDisplay();
+        updateDashboard();  // refresh nudge + team card immediately (no reload needed)
         showToast(`Joined "${teamName}" 👥`, 'success');
     }
 }
@@ -3032,6 +3033,7 @@ function leaveTeam() {
     saveData();
     supabaseSaveProfile(appState.currentUser).catch(() => {});
     _updateTeamDisplay();
+    updateDashboard();  // refresh nudge + team card immediately (no reload needed)
     hideTeamPicker();
     showToast(`Left team "${prev}"`, 'success');
 }
