@@ -1890,7 +1890,8 @@ function updateDashboard() {
     if (greetSubEl) {
         const h = new Date().getHours();
         const tod = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-        greetSubEl.textContent = tod;
+        const dstr = new Date().toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
+        greetSubEl.textContent = `${tod} · ${dstr}`;
     }
     if (nameEl) {
         const firstName = user.name.split(' ')[0];
@@ -2101,6 +2102,8 @@ function renderWeeklyGoal() {
     container.style.cursor = 'pointer';
     container.onclick = showWeeklyGoalModal;  // tap to edit + see weekly history
 
+    const weekLabel = _fmtWeekRange(getWeekStartForParticipant(user));
+
     if (goalNum && goalNum > 0) {
         // Numeric goal: show progress dots
         const thisWeek = calculateWeeklyImprovement(user).thisWeek;
@@ -2113,15 +2116,47 @@ function renderWeeklyGoal() {
         else if (over) msg = `🔥 ${thisWeek}/${goalNum} - weekly goal crushed!`;
         else msg = `💪 ${thisWeek} of ${goalNum} this week`;
         container.innerHTML = `<div class="weekly-goal-inner${over ? ' goal-done' : ''}">
-            <span class="weekly-goal-text">${msg}</span>
+            <div class="weekly-goal-main">
+                <span class="weekly-goal-week">${weekLabel}</span>
+                <span class="weekly-goal-text">${msg}</span>
+            </div>
             <div class="weekly-goal-dots">${dots}</div>
         </div>`;
     } else {
         // Text goal: show as reminder
         container.innerHTML = `<div class="weekly-goal-inner">
-            <span class="weekly-goal-text">🎯 Goal: ${_htmlEsc(goalText)}</span>
+            <div class="weekly-goal-main">
+                <span class="weekly-goal-week">${weekLabel}</span>
+                <span class="weekly-goal-text">🎯 Goal: ${_htmlEsc(goalText)}</span>
+            </div>
         </div>`;
     }
+}
+
+// Format a Mon-Sun week range from its Monday, e.g. "1 Sep - 7 Sep"
+function _fmtWeekRange(weekStart) {
+    const end = new Date(weekStart); end.setDate(end.getDate() + 6);
+    const f = d => d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+    return `${f(weekStart)} - ${f(end)}`;
+}
+
+// Monday (as YYYY-MM-DD) of the week containing a date
+function _weekStartStr(d) {
+    const x = new Date(d); const dow = x.getDay();
+    x.setDate(x.getDate() - dow + (dow === 0 ? -6 : 1));
+    x.setHours(0, 0, 0, 0);
+    return getDateString(x);
+}
+
+// The goal that applied for a given week: the latest snapshot at/before that
+// week, else the current goal. Lets people change goals freely without locking.
+function _goalForWeek(user, weekStartDate) {
+    const hist = user?.seasonSetup?.weeklyGoalHistory || {};
+    const target = getDateString(weekStartDate);
+    let best = null, bestKey = '';
+    Object.keys(hist).forEach(k => { if (k <= target && k >= bestKey) { bestKey = k; best = hist[k]; } });
+    if (best !== null && best !== undefined) return best;
+    return user?.seasonSetup?.weeklyGoalText || (user?.weeklyGoal ? String(user.weeklyGoal) : '');
 }
 
 // Build a week-by-week history (Mon-Sun) from season start to today
@@ -2165,17 +2200,19 @@ function showWeeklyGoalModal() {
     }
     overlay.style.display = 'flex';
     const currentVal = user.seasonSetup?.weeklyGoalText || (user.weeklyGoal ? String(user.weeklyGoal) : '');
-    const goalNum = /^\d+$/.test((currentVal || '').trim()) ? parseInt(currentVal) : null;
 
     const fmt = (d) => d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
     const weeks = _computeWeeklyHistory(user);
     let histHtml = '';
     weeks.forEach((w, i) => {
         const isCurrent = i === 0;
+        // Each week uses the goal that applied then (people can change it freely)
+        const weekGoalRaw = (_goalForWeek(user, w.start) || '').trim();
+        const weekGoalNum = /^\d+$/.test(weekGoalRaw) ? parseInt(weekGoalRaw) : null;
         let right;
-        if (goalNum && goalNum > 0) {
-            const met = w.done >= goalNum;
-            right = `<span style="font-weight:800;color:${met ? '#059669' : 'var(--text-primary)'};">${w.done}/${goalNum}</span> ${met ? '✅' : (isCurrent ? '⏳' : '❌')}`;
+        if (weekGoalNum && weekGoalNum > 0) {
+            const met = w.done >= weekGoalNum;
+            right = `<span style="font-weight:800;color:${met ? '#059669' : 'var(--text-primary)'};">${w.done}/${weekGoalNum}</span> ${met ? '✅' : (isCurrent ? '⏳' : '❌')}`;
         } else {
             right = `<span style="font-weight:800;color:var(--primary);">${w.done}</span> <span style="color:var(--text-secondary);font-size:12px;">workouts</span>`;
         }
@@ -2215,6 +2252,9 @@ function saveWeeklyGoalFromModal() {
     user.weeklyGoal = (isPureNumber && parseInt(raw) > 0) ? parseInt(raw) : null;
     if (!user.seasonSetup) user.seasonSetup = {};
     user.seasonSetup.weeklyGoalText = raw || null;
+    // Snapshot the goal for the current week so history reflects changes over time
+    if (!user.seasonSetup.weeklyGoalHistory) user.seasonSetup.weeklyGoalHistory = {};
+    user.seasonSetup.weeklyGoalHistory[_weekStartStr(getDateInTimezone(user.timezone || 'Asia/Kolkata'))] = raw || null;
     const idx = appState.participants.findIndex(p => p.phone === user.phone);
     if (idx >= 0) {
         appState.participants[idx].weeklyGoal = user.weeklyGoal;
@@ -5246,6 +5286,8 @@ function saveSettings() {
     appState.currentUser.weeklyGoal = weeklyGoal;
     if (!appState.currentUser.seasonSetup) appState.currentUser.seasonSetup = {};
     appState.currentUser.seasonSetup.weeklyGoalText = weeklyGoalRaw || null;
+    if (!appState.currentUser.seasonSetup.weeklyGoalHistory) appState.currentUser.seasonSetup.weeklyGoalHistory = {};
+    appState.currentUser.seasonSetup.weeklyGoalHistory[_weekStartStr(getDateInTimezone(appState.currentUser.timezone || 'Asia/Kolkata'))] = weeklyGoalRaw || null;
 
     const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
     if (idx >= 0) {
