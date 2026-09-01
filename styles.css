@@ -615,7 +615,7 @@ body {
         inset 0 1px 0 rgba(255,255,255,0.18),
         inset 0 -1px 0 rgba(0,0,0,0.15);
 }
-/* Large decorative circle — top right */
+/* Large decorative circle - top right */
 .streak-card::before {
     content: '';
     position: absolute;
@@ -627,7 +627,7 @@ body {
     background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%);
     pointer-events: none;
 }
-/* Small decorative circle — bottom left */
+/* Small decorative circle - bottom left */
 .streak-card > .streak-card-ring {
     display: none;
 }
@@ -6822,7 +6822,7 @@ body.modal-open {
 }
 
 /* ============================================
-   LUXURY CHECKIN BUTTONS — selected state
+   LUXURY CHECKIN BUTTONS - selected state
    ============================================ */
 .checkin-btn-v2.selected-yes {
     background: linear-gradient(135deg, #059669 0%, #047857 100%);
@@ -6925,6 +6925,18 @@ body.modal-open {
     background: rgba(255,255,255,0.07);
     pointer-events: none;
 }
+.tdc-join-another {
+    width: 100%;
+    padding: 14px;
+    border: 1px dashed rgba(5,150,105,0.4);
+    background: rgba(5,150,105,0.06);
+    color: var(--primary);
+    border-radius: 16px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.tdc-join-another:active { transform: scale(0.98); }
 .tdc-header {
     display: flex;
     align-items: flex-start;

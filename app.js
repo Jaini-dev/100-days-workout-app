@@ -1973,15 +1973,15 @@ function updateDashboard() {
     if (msgEl) {
         if (totalWorkouts === 0) msgEl.textContent = "Log your first workout!";
         else if (weeklyWorkouts >= 5) msgEl.textContent = "Crushing it this week! 🔥";
-        else if (weeklyWorkouts > 0) msgEl.textContent = "Nice — keep the momentum going!";
-        else msgEl.textContent = "New week — let's move!";
+        else if (weeklyWorkouts > 0) msgEl.textContent = "Nice work! Keep the momentum going!";
+        else msgEl.textContent = "New week, let's move!";
     }
 
     // Stats
     const totalEl = $('total-workouts');
     if (totalEl) totalEl.textContent = totalWorkouts;
 
-    // Streak — shown once here, beside completion rate
+    // Streak - shown once here, beside completion rate
     const streakStatEl = $('streak-stat');
     if (streakStatEl) streakStatEl.textContent = streak;
 
@@ -2098,6 +2098,8 @@ function renderWeeklyGoal() {
     if (!user || (!goalText && !goalNum)) { container.style.display = 'none'; return; }
 
     container.style.display = 'block';
+    container.style.cursor = 'pointer';
+    container.onclick = showWeeklyGoalModal;  // tap to edit + see weekly history
 
     if (goalNum && goalNum > 0) {
         // Numeric goal: show progress dots
@@ -2120,6 +2122,109 @@ function renderWeeklyGoal() {
             <span class="weekly-goal-text">🎯 Goal: ${_htmlEsc(goalText)}</span>
         </div>`;
     }
+}
+
+// Build a week-by-week history (Mon-Sun) from season start to today
+function _computeWeeklyHistory(user) {
+    const checkins = user?.checkins || {};
+    const start = new Date(challengeSettings.startDate + 'T00:00:00');
+    const today = getDateInTimezone(user?.timezone || 'Asia/Kolkata');
+    today.setHours(0, 0, 0, 0);
+    // First Monday on/before the season start
+    const firstMon = new Date(start);
+    const dow = firstMon.getDay();
+    firstMon.setDate(firstMon.getDate() - dow + (dow === 0 ? -6 : 1));
+    firstMon.setHours(0, 0, 0, 0);
+    const weeks = [];
+    let cur = new Date(firstMon);
+    let guard = 0;
+    while (cur <= today && guard < 80) {
+        const wkStart = new Date(cur);
+        const wkEnd = new Date(cur); wkEnd.setDate(wkEnd.getDate() + 6);
+        let done = 0;
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(cur); d.setDate(d.getDate() + i);
+            const ds = getDateString(d);
+            if (ds >= challengeSettings.startDate && checkins[ds] === 'Y') done++;
+        }
+        weeks.push({ start: wkStart, end: wkEnd, done });
+        cur.setDate(cur.getDate() + 7); guard++;
+    }
+    return weeks.reverse(); // newest week first
+}
+
+function showWeeklyGoalModal() {
+    const user = appState.currentUser;
+    if (!user) return;
+    let overlay = $('weekly-goal-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'weekly-goal-overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:2000;background:var(--bg-page);overflow-y:auto;display:flex;flex-direction:column;';
+        document.body.appendChild(overlay);
+    }
+    overlay.style.display = 'flex';
+    const currentVal = user.seasonSetup?.weeklyGoalText || (user.weeklyGoal ? String(user.weeklyGoal) : '');
+    const goalNum = /^\d+$/.test((currentVal || '').trim()) ? parseInt(currentVal) : null;
+
+    const fmt = (d) => d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+    const weeks = _computeWeeklyHistory(user);
+    let histHtml = '';
+    weeks.forEach((w, i) => {
+        const isCurrent = i === 0;
+        let right;
+        if (goalNum && goalNum > 0) {
+            const met = w.done >= goalNum;
+            right = `<span style="font-weight:800;color:${met ? '#059669' : 'var(--text-primary)'};">${w.done}/${goalNum}</span> ${met ? '✅' : (isCurrent ? '⏳' : '❌')}`;
+        } else {
+            right = `<span style="font-weight:800;color:var(--primary);">${w.done}</span> <span style="color:var(--text-secondary);font-size:12px;">workouts</span>`;
+        }
+        histHtml += `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border-color);">
+            <div>
+                <div style="font-weight:700;color:var(--text-primary);font-size:14px;">${fmt(w.start)} - ${fmt(w.end)}${isCurrent ? ' <span style="font-size:11px;color:var(--primary);">(this week)</span>' : ''}</div>
+            </div>
+            <div style="font-size:15px;">${right}</div>
+        </div>`;
+    });
+
+    overlay.innerHTML = `
+        <div style="display:flex;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border-color);gap:12px;position:sticky;top:0;background:var(--bg-page);z-index:1;">
+            <button onclick="document.getElementById('weekly-goal-overlay').remove();" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-primary);line-height:1;">←</button>
+            <h2 style="margin:0;font-size:18px;font-weight:800;color:var(--text-primary);">🎯 Weekly Goal</h2>
+        </div>
+        <div style="padding:20px;flex:1;">
+            <label style="display:block;font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;">Your weekly goal</label>
+            <div style="display:flex;gap:8px;">
+                <input id="wg-input" type="text" value="${_htmlEsc(currentVal)}" placeholder="e.g. 5 workouts, 20km, 3 runs"
+                    style="flex:1;padding:12px 14px;border-radius:12px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-primary);font-size:15px;">
+                <button onclick="saveWeeklyGoalFromModal()" style="padding:12px 18px;border:none;border-radius:12px;background:var(--gradient-1);color:#fff;font-weight:800;font-size:15px;cursor:pointer;">Save</button>
+            </div>
+            <p style="font-size:12px;color:var(--text-secondary);margin:8px 0 0;">Tip: use a plain number (like 5) to track your weekly progress. Text goals (like "20km") show as a reminder.</p>
+
+            <div style="margin-top:24px;font-size:13px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;">Weekly history</div>
+            <div style="margin-top:8px;">${histHtml || '<p style="color:var(--text-secondary);">No weeks yet.</p>'}</div>
+        </div>`;
+    setTimeout(() => $('wg-input')?.focus(), 100);
+}
+
+function saveWeeklyGoalFromModal() {
+    const user = appState.currentUser;
+    if (!user) return;
+    const raw = ($('wg-input')?.value || '').trim();
+    const isPureNumber = /^\d+$/.test(raw);
+    user.weeklyGoal = (isPureNumber && parseInt(raw) > 0) ? parseInt(raw) : null;
+    if (!user.seasonSetup) user.seasonSetup = {};
+    user.seasonSetup.weeklyGoalText = raw || null;
+    const idx = appState.participants.findIndex(p => p.phone === user.phone);
+    if (idx >= 0) {
+        appState.participants[idx].weeklyGoal = user.weeklyGoal;
+        appState.participants[idx].seasonSetup = user.seasonSetup;
+    }
+    saveData();
+    supabaseSaveProfile(user).catch(() => {});
+    showToast(raw ? 'Weekly goal saved! 🎯' : 'Weekly goal cleared', 'success');
+    updateDashboard();
+    showWeeklyGoalModal(); // re-render with new goal + refreshed history
 }
 
 let _wdsDate = null;
@@ -3043,7 +3148,7 @@ function joinTeam(teamName) {
     if (!name) return;
     const teams = getUserTeams(u).slice();
     if (teams.some(t => t.trim().toLowerCase() === name.toLowerCase())) {
-        // already a member — just show its detail
+        // already a member - just show its detail
         showTeamDetail(name);
         return;
     }
@@ -3143,6 +3248,8 @@ function renderTeamDashboardCard() {
     const cards = myTeams.map(teamName => _tdcCardHtml(teamName, allTeams)).filter(Boolean);
     if (!cards.length) { card.innerHTML = ''; card.style.display = 'none'; return; }
 
+    // "Join another team" lets a member add more teams right from the dashboard
+    cards.push(`<button class="tdc-join-another" onclick="showTeamPicker()">＋ Join another team</button>`);
     card.innerHTML = cards.join('');
     card.style.display = 'flex';
 }
@@ -5417,6 +5524,8 @@ window.showS6HistoryModal = showS6HistoryModal;
 window.showS6ParticipantCalendar = showS6ParticipantCalendar;
 window.showMyWorkouts = showMyWorkouts;
 window.toggleSidebar = toggleSidebar;
+window.showWeeklyGoalModal = showWeeklyGoalModal;
+window.saveWeeklyGoalFromModal = saveWeeklyGoalFromModal;
 window.deleteTestAccounts = deleteTestAccounts;
 window.dismissWorkoutDetails = dismissWorkoutDetails;
 window.selectWdsChip = selectWdsChip;
