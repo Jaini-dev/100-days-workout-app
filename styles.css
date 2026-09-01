@@ -4621,7 +4621,11 @@ body.modal-open .hamburger-btn { display: none; }
     width: 44px;
     height: 44px;
     border-radius: 50%;
-    background: var(--gradient-1);
+    background-color: #059669;
+    background-image: var(--gradient-1);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -4630,6 +4634,7 @@ body.modal-open .hamburger-btn { display: none; }
     font-weight: 700;
     margin-right: 12px;
     flex-shrink: 0;
+    overflow: hidden;
 }
 
 .lb-info {

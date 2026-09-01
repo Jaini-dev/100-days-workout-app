@@ -2805,7 +2805,11 @@ function renderLeaderboard(category = 'thisWeek') {
                     primaryValue = p.totalWorkouts;
             }
 
-            const rankDisplay = rank <= 3 ? medals[rank - 1] : rank;
+            // Award medals only to top-3 who have actual progress; otherwise show a
+            // plain sequential position (avoids everyone being "🥇 #1" when all at 0)
+            const metricNum = typeof primaryValue === 'number' ? primaryValue : parseInt(primaryValue) || 0;
+            const hasProgress = metricNum > 0 || (p.totalWorkouts || 0) > 0;
+            const rankDisplay = (hasProgress && rank <= 3) ? medals[rank - 1] : (hasProgress ? rank : (i + 1));
 
             html += `
                 <tr class="${isMe ? 'lb-row-me' : ''}">
