@@ -1897,19 +1897,9 @@ function updateDashboard() {
         const firstName = user.name.split(' ')[0];
         nameEl.innerHTML = firstName + ' 👋';
     }
-    // Role badge sits on the subtitle line (keeps name clean, avoids wrapping)
+    // Admin badge is shown in Settings only, not on the dashboard greeting
     const roleBadgeEl = $('user-role-badge');
-    if (roleBadgeEl) {
-        if (appState.isSuperAdmin) {
-            roleBadgeEl.textContent = '👑 ADMIN';
-            roleBadgeEl.style.display = '';
-        } else if (appState.isAdmin) {
-            roleBadgeEl.textContent = 'ADMIN';
-            roleBadgeEl.style.display = '';
-        } else {
-            roleBadgeEl.style.display = 'none';
-        }
-    }
+    if (roleBadgeEl) roleBadgeEl.style.display = 'none';
 
     // Current workouts count (top right badge)
     const dayEl = $('current-day');
