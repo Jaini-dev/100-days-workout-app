@@ -3919,20 +3919,31 @@ function openDayEditor(dateStr, currentStatus) {
         btn.classList.toggle('selected', btn.dataset.status === currentStatus);
     });
 
-    // Show existing workout details for Y days
+    // For a logged day, show the recap (photo + chips) and hide the Workout/Rest/Skipped
+    // buttons behind an "Edit workout" button. For a new day, show the buttons directly.
+    const isLogged = !!currentStatus;
     const detailsEl = $('quick-log-details');
+    const statusButtons = $('quick-log-status-buttons');
+    const editBtn = $('ql-edit-btn');
+
     if (detailsEl) {
-        const details = currentStatus === 'Y' ? ((appState.currentUser?.checkinDetails || {})[dateStr] || {}) : null;
-        if (details) {
-            // Logged day: show the photo (1:1) + an Edit Details button. The text chips
-            // (type/mood/note) live inside the Edit Details sheet to keep this view clean.
+        if (isLogged) {
             detailsEl.style.display = '';
+            const details = (appState.currentUser?.checkinDetails || {})[dateStr] || {};
             const metaEl = $('ql-meta');
-            if (metaEl) metaEl.innerHTML = '';
+            if (metaEl) {
+                const parts = [];
+                if (currentStatus === 'R') parts.push('🧘 Rest day');
+                else if (currentStatus === 'N') parts.push('😴 Skipped');
+                if (details.type) parts.push(`${getWorkoutTypeIcon(details.type)} ${details.type}`);
+                if (details.mood) parts.push(details.mood);
+                if (details.note) parts.push(`"${details.note}"`);
+                metaEl.innerHTML = parts.map(p => `<span class="ql-tag">${p}</span>`).join('');
+            }
             const photoWrap = $('ql-photo-wrap');
             const photoEl = $('ql-photo');
             if (photoWrap && photoEl) {
-                if (details.photo) {
+                if (currentStatus === 'Y' && details.photo) {
                     photoWrap.style.display = '';
                     photoEl.style.backgroundImage = '';
                     getSB().storage.from(CONFIG.CHECKIN_PHOTO_BUCKET).createSignedUrl(details.photo, 7 * 24 * 3600)
@@ -3947,9 +3958,19 @@ function openDayEditor(dateStr, currentStatus) {
             detailsEl.style.display = 'none';
         }
     }
+    // Logged day: buttons hidden until "Edit workout" tapped. New day: buttons shown.
+    if (editBtn) editBtn.style.display = isLogged ? '' : 'none';
+    if (statusButtons) statusButtons.style.display = isLogged ? 'none' : '';
 
     modal.classList.add('active');
 }
+
+window.revealDayStatusButtons = function() {
+    const statusButtons = $('quick-log-status-buttons');
+    if (statusButtons) statusButtons.style.display = '';
+    const editBtn = $('ql-edit-btn');
+    if (editBtn) editBtn.style.display = 'none';
+};
 
 window.openWorkoutDetailsFromModal = function() {
     const dateStr = $('quick-log-date')?.dataset.date;
