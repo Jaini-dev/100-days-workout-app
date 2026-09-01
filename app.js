@@ -529,6 +529,9 @@ function _buildParticipant(row, checkinRows) {
         timezone: row.timezone || 'Asia/Kolkata',
         weeklyGoal: row.weekly_goal || null,
         teamName: row.team_name || null,
+        teams: (Array.isArray(row.season_setup?.teams) && row.season_setup.teams.length)
+            ? row.season_setup.teams.slice()
+            : (row.team_name ? [row.team_name] : []),
         customWorkoutTypes: row.custom_workout_types || [],
         checkinDetails: row.checkin_details || {},
         centuryClub: row.century_club || null,
@@ -861,8 +864,8 @@ window.submitS7Setup = async function() {
     user.goal = goal;
     user.commitment = commitment || user.commitment;
     if (weekly) user.weeklyGoal = parseInt(weekly);
-    if (_s7TeamChosen) user.teamName = _s7TeamChosen;
-    user.seasonSetup = { ...( user.seasonSetup || {}), s7: true };
+    if (_s7TeamChosen) { user.teams = [_s7TeamChosen]; _syncUserTeams(user); }
+    user.seasonSetup = { ...( user.seasonSetup || {}), s7: true, teams: getUserTeams(user) };
     await supabaseSaveProfile(user);
     saveData();
     $('s7-setup-overlay').style.display = 'none';
@@ -1929,7 +1932,7 @@ function updateDashboard() {
     }
     // "Join a team" nudge on dashboard if no team
     const noTeamNudge = $('no-team-nudge');
-    if (noTeamNudge) noTeamNudge.style.display = appState.currentUser?.teamName ? 'none' : '';
+    if (noTeamNudge) noTeamNudge.style.display = getUserTeams(appState.currentUser).length ? 'none' : '';
 
     // "Update past records" link - show from Sep 2 onwards (or always for admins)
     const pastLink = $('update-past-link');
@@ -2881,31 +2884,39 @@ function _tpsSetHeader(showBack, title) {
 }
 
 function showTeamList() {
-    _tpsSetHeader(false, 'Join a Team');
+    _tpsSetHeader(false, 'Teams');
     const enriched = getSortedParticipants('all');
     const teamsMap = {};
     enriched.forEach(p => {
-        const name = (p.teamName || '').trim();
-        if (!name) return;
-        const key = name.toLowerCase();
-        if (!teamsMap[key]) teamsMap[key] = { name, members: [] };
-        teamsMap[key].members.push(p);
+        getUserTeams(p).forEach(raw => {
+            const name = (raw || '').trim();
+            if (!name) return;
+            const key = name.toLowerCase();
+            if (!teamsMap[key]) teamsMap[key] = { name, members: [] };
+            teamsMap[key].members.push(p);
+        });
     });
-    // Ensure current user's team always appears even if participants sync is stale
-    const myKey = (appState.currentUser?.teamName || '').trim().toLowerCase();
-    if (myKey && !teamsMap[myKey]) {
-        teamsMap[myKey] = { name: appState.currentUser.teamName, members: [appState.currentUser] };
-    }
+    // Ensure the current user's teams always appear even if participants sync is stale
+    const myTeams = getUserTeams(appState.currentUser);
+    myTeams.forEach(raw => {
+        const key = (raw || '').trim().toLowerCase();
+        if (key && !teamsMap[key]) teamsMap[key] = { name: raw, members: [appState.currentUser] };
+    });
+    const myKeys = myTeams.map(t => t.trim().toLowerCase());
     const teams = Object.values(teamsMap).sort((a, b) => b.members.length - a.members.length);
 
     const body = $('tps-body');
     if (!body) return;
     let html = '';
 
+    if (myKeys.length) {
+        html += `<div class="tps-section-label">You're on ${myKeys.length} team${myKeys.length > 1 ? 's' : ''} · you can join more</div>`;
+    }
+
     if (teams.length > 0) {
-        html += '<div class="tps-section-label">Existing teams</div>';
+        html += '<div class="tps-section-label">All teams</div>';
         teams.forEach(team => {
-            const isMyTeam = myKey && team.name.toLowerCase() === myKey;
+            const isMyTeam = myKeys.includes(team.name.toLowerCase());
             const preview = team.members.map(m => m.name.split(' ')[0]).slice(0, 4).join(', ') + (team.members.length > 4 ? '…' : '');
             html += `
                 <div class="tps-team-card${isMyTeam ? ' tps-team-card-joined' : ''}" data-team="${_htmlEsc(team.name)}" onclick="showTeamDetail(this.dataset.team)">
@@ -2923,7 +2934,6 @@ function showTeamList() {
     }
 
     html += `<button class="tps-create-btn" onclick="showCreateTeam()">＋ Create a new team</button>`;
-    if (myKey) html += `<button class="tps-leave-btn" onclick="confirmLeaveTeam()">Leave current team</button>`;
     body.innerHTML = html;
 }
 
@@ -2933,9 +2943,8 @@ function showTeamDetail(teamName) {
 
     const todayDate = getTodayString();
     const enriched = getSortedParticipants('all').filter(p => p.seasonSetup?.s7);
-    const members = enriched.filter(p => (p.teamName || '').trim().toLowerCase() === teamName.toLowerCase());
-    const myKey = (appState.currentUser?.teamName || '').trim().toLowerCase();
-    const isMyTeam = myKey === teamName.toLowerCase();
+    const members = enriched.filter(p => userInTeam(p, teamName));
+    const isMyTeam = userInTeam(appState.currentUser, teamName);
 
     // Team stats
     const totalWorkouts = members.reduce((sum, m) => sum + (m.totalWorkouts || 0), 0);
@@ -2973,7 +2982,7 @@ function showTeamDetail(teamName) {
 
     html += `</div>`;
     if (isMyTeam) {
-        html += `<button class="tps-leave-btn tps-leave-btn-full" onclick="confirmLeaveTeam()">Leave this team</button>`;
+        html += `<button class="tps-leave-btn tps-leave-btn-full" data-team="${_htmlEsc(teamName)}" onclick="confirmLeaveTeam(this.dataset.team)">Leave this team</button>`;
     } else {
         html += `<button class="tps-join-btn" data-team="${_htmlEsc(teamName)}" onclick="joinTeam(this.dataset.team)">Join ${_htmlEsc(teamName)} 👥</button>`;
     }
@@ -3000,60 +3009,108 @@ function confirmCreateTeam() {
     joinTeam(name);
 }
 
-function joinTeam(teamName) {
-    if (!appState.currentUser) return;
-    appState.currentUser.teamName = teamName;
-    const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
-    if (idx >= 0) appState.participants[idx].teamName = teamName;
-    saveData();
-    supabaseSaveProfile(appState.currentUser).catch(() => {});
-    hideTeamPicker();
-    if (window._teamPickerCallback) {
-        window._teamPickerCallback(teamName);
-        window._teamPickerCallback = null;
-    } else {
-        _updateTeamDisplay();
-        updateDashboard();  // refresh nudge + team card immediately (no reload needed)
-        showToast(`Joined "${teamName}" 👥`, 'success');
+function _syncParticipantTeams(u) {
+    // mirror the current user's team state onto their entry in the participants list
+    const idx = appState.participants.findIndex(p => p.phone === u.phone);
+    if (idx >= 0) {
+        appState.participants[idx].teams = u.teams.slice();
+        appState.participants[idx].teamName = u.teamName;
+        appState.participants[idx].seasonSetup = u.seasonSetup;
     }
 }
 
-function confirmLeaveTeam() {
-    const teamName = appState.currentUser?.teamName || 'this team';
-    if (!confirm(`Leave "${teamName}"? You can rejoin or join a different team anytime.`)) return;
-    leaveTeam();
+function joinTeam(teamName) {
+    if (!appState.currentUser) return;
+    const u = appState.currentUser;
+    const name = (teamName || '').trim();
+    if (!name) return;
+    const teams = getUserTeams(u).slice();
+    if (teams.some(t => t.trim().toLowerCase() === name.toLowerCase())) {
+        // already a member — just show its detail
+        showTeamDetail(name);
+        return;
+    }
+    teams.push(name);
+    u.teams = teams;
+    _syncUserTeams(u);
+    _syncParticipantTeams(u);
+    saveData();
+    supabaseSaveProfile(u).catch(() => {});
+    if (window._teamPickerCallback) {
+        hideTeamPicker();
+        window._teamPickerCallback(name);
+        window._teamPickerCallback = null;
+    } else {
+        _updateTeamDisplay();
+        updateDashboard();  // refresh nudge + team cards immediately (no reload needed)
+        showToast(`Joined "${name}" 👥`, 'success');
+        // Return to the team list so they can join more or see all their teams
+        showTeamList();
+    }
 }
 
-function leaveTeam() {
+function confirmLeaveTeam(teamName) {
+    const name = (teamName || getUserTeams(appState.currentUser)[0] || 'this team');
+    if (!confirm(`Leave "${name}"? You can rejoin or join a different team anytime.`)) return;
+    leaveTeam(name);
+}
+
+function leaveTeam(teamName) {
     if (!appState.currentUser) return;
-    const prev = appState.currentUser.teamName;
-    appState.currentUser.teamName = null;
-    const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
-    if (idx >= 0) appState.participants[idx].teamName = null;
+    const u = appState.currentUser;
+    const target = (teamName || getUserTeams(u)[0] || '').trim().toLowerCase();
+    u.teams = getUserTeams(u).filter(t => t.trim().toLowerCase() !== target);
+    _syncUserTeams(u);
+    _syncParticipantTeams(u);
     saveData();
-    supabaseSaveProfile(appState.currentUser).catch(() => {});
+    supabaseSaveProfile(u).catch(() => {});
     _updateTeamDisplay();
-    updateDashboard();  // refresh nudge + team card immediately (no reload needed)
-    hideTeamPicker();
-    showToast(`Left team "${prev}"`, 'success');
+    updateDashboard();  // refresh nudge + team cards immediately (no reload needed)
+    showToast(`Left team "${teamName}"`, 'success');
+    // Back to the list (still shows remaining teams / lets them join others)
+    showTeamList();
 }
 
 function _updateTeamDisplay() {
     const el = $('settings-team-display');
-    if (el) el.textContent = appState.currentUser?.teamName || 'No team';
+    const teams = getUserTeams(appState.currentUser);
+    if (el) el.textContent = teams.length ? teams.join(', ') : 'No team';
+}
+
+// ---- Multi-team helpers ----
+// A member can belong to several teams. We keep a `teams` array as the source of
+// truth, persisted in season_setup.teams, and keep teamName (DB column) synced to
+// the first team for backward compatibility.
+function getUserTeams(u) {
+    if (!u) return [];
+    if (Array.isArray(u.teams)) return u.teams.filter(Boolean);
+    if (u.teamName) return [u.teamName];
+    return [];
+}
+function userInTeam(u, name) {
+    const k = (name || '').trim().toLowerCase();
+    return getUserTeams(u).some(t => (t || '').trim().toLowerCase() === k);
+}
+function _syncUserTeams(u) {
+    u.teams = (u.teams || []).filter(Boolean);
+    u.teamName = u.teams[0] || null;
+    if (!u.seasonSetup) u.seasonSetup = {};
+    u.seasonSetup.teams = u.teams.slice();
 }
 
 function _getTeamsMap() {
     const enriched = getSortedParticipants('all').filter(p => p.seasonSetup?.s7);
     const teamsMap = {};
     enriched.forEach(p => {
-        const name = (p.teamName || '').trim();
-        if (!name) return;
-        const key = name.toLowerCase();
-        if (!teamsMap[key]) teamsMap[key] = { name, members: [], total: 0, thisWeek: 0 };
-        teamsMap[key].members.push(p);
-        teamsMap[key].total += p.totalWorkouts || 0;
-        teamsMap[key].thisWeek += p.weeklyWorkouts || 0;
+        getUserTeams(p).forEach(raw => {
+            const name = (raw || '').trim();
+            if (!name) return;
+            const key = name.toLowerCase();
+            if (!teamsMap[key]) teamsMap[key] = { name, members: [], total: 0, thisWeek: 0 };
+            teamsMap[key].members.push(p);
+            teamsMap[key].total += p.totalWorkouts || 0;
+            teamsMap[key].thisWeek += p.weeklyWorkouts || 0;
+        });
     });
     return teamsMap;
 }
@@ -3062,14 +3119,21 @@ function renderTeamDashboardCard() {
     const card = $('team-dashboard-card');
     if (!card) return;
     const user = appState.currentUser;
-    if (!user?.teamName) { card.style.display = 'none'; return; }
+    const myTeams = getUserTeams(user);
+    if (!myTeams.length) { card.innerHTML = ''; card.style.display = 'none'; return; }
 
-    const myTeamKey = user.teamName.trim().toLowerCase();
+    const allTeams = Object.values(_getTeamsMap()).sort((a, b) => b.total - a.total);
+    const cards = myTeams.map(teamName => _tdcCardHtml(teamName, allTeams)).filter(Boolean);
+    if (!cards.length) { card.innerHTML = ''; card.style.display = 'none'; return; }
+
+    card.innerHTML = cards.join('');
+    card.style.display = 'flex';
+}
+
+function _tdcCardHtml(teamName, allTeams) {
     const todayDate = getTodayString();
-    const teamMembers = appState.participants.filter(p =>
-        p.seasonSetup?.s7 && (p.teamName || '').trim().toLowerCase() === myTeamKey
-    );
-    if (teamMembers.length === 0) { card.style.display = 'none'; return; }
+    const teamMembers = appState.participants.filter(p => p.seasonSetup?.s7 && userInTeam(p, teamName));
+    if (teamMembers.length === 0) return '';
 
     const totalWorkouts = teamMembers.reduce((sum, m) => sum + (m.totalWorkouts || 0), 0);
     const loggedToday = teamMembers.filter(p => {
@@ -3078,8 +3142,7 @@ function renderTeamDashboardCard() {
     }).length;
     const allLoggedToday = loggedToday === teamMembers.length;
 
-    const allTeams = Object.values(_getTeamsMap()).sort((a, b) => b.total - a.total);
-    const teamRankIdx = allTeams.findIndex(t => t.name.toLowerCase() === myTeamKey);
+    const teamRankIdx = (allTeams || []).findIndex(t => t.name.toLowerCase() === teamName.trim().toLowerCase());
     const teamRank = teamRankIdx >= 0 ? teamRankIdx + 1 : null;
 
     const membersHtml = teamMembers.map(m => {
@@ -3095,10 +3158,10 @@ function renderTeamDashboardCard() {
         </div>`;
     }).join('');
 
-    card.innerHTML = `
+    return `<div class="tdc-card">
         <div class="tdc-header">
             <div class="tdc-team-info">
-                <div class="tdc-team-name">👥 ${_htmlEsc(user.teamName)}</div>
+                <div class="tdc-team-name">👥 ${_htmlEsc(teamName)}</div>
                 <div class="tdc-team-sub">${teamRank ? `#${teamRank} team · ` : ''}${totalWorkouts} total days · ${teamMembers.length} members</div>
             </div>
             <button class="tdc-view-btn" onclick="showTab('leaderboard');setTimeout(()=>renderLeaderboard('teams'),150);">Leaderboard →</button>
@@ -3107,8 +3170,7 @@ function renderTeamDashboardCard() {
         <div class="tdc-today">
             <span class="tdc-today-pill ${allLoggedToday ? 'tdc-all-logged' : ''}">${loggedToday}/${teamMembers.length} logged today${allLoggedToday ? ' 🔥' : ''}</span>
         </div>
-    `;
-    card.style.display = 'block';
+    </div>`;
 }
 
 function renderTeamsLeaderboard() {
@@ -3117,20 +3179,9 @@ function renderTeamsLeaderboard() {
     const list = $('leaderboard-list');
     if (!list) return;
 
-    const enriched = getSortedParticipants('all');
-    const teamsMap = {};
-    enriched.forEach(p => {
-        const name = (p.teamName || '').trim();
-        if (!name) return;
-        const key = name.toLowerCase();
-        if (!teamsMap[key]) teamsMap[key] = { name, members: [], total: 0, thisWeek: 0 };
-        teamsMap[key].members.push(p);
-        teamsMap[key].total += p.totalWorkouts || 0;
-        teamsMap[key].thisWeek += p.weeklyWorkouts || 0;
-    });
-
+    const teamsMap = _getTeamsMap();
     const teams = Object.values(teamsMap).sort((a, b) => b.total - a.total || b.thisWeek - a.thisWeek);
-    const myKey = (appState.currentUser?.teamName || '').trim().toLowerCase();
+    const myKeys = getUserTeams(appState.currentUser).map(t => t.trim().toLowerCase());
 
     if (teams.length === 0) {
         list.innerHTML = `
@@ -3145,7 +3196,7 @@ function renderTeamsLeaderboard() {
     const medals = ['🥇', '🥈', '🥉'];
     let html = '';
     teams.forEach((team, i) => {
-        const isMyTeam = myKey && team.name.toLowerCase() === myKey;
+        const isMyTeam = myKeys.includes(team.name.toLowerCase());
         const rankDisplay = i < 3 ? medals[i] : `#${i + 1}`;
         const firstNames = team.members.map(m => m.name.split(' ')[0]).join(', ');
         html += `
@@ -3431,7 +3482,7 @@ function renderParticipantsList(participants) {
 
         const avatarStyle = p.profilePhotoUrl ? `background-image:url('${p.profilePhotoUrl}');` : '';
         const avatarInitial = p.profilePhotoUrl ? '' : (p.name || '?').charAt(0).toUpperCase();
-        const teamBadge = p.teamName ? `<span class="pr-team-badge">👥 ${p.teamName}</span>` : '';
+        const teamBadge = getUserTeams(p).map(t => `<span class="pr-team-badge">👥 ${_htmlEsc(t)}</span>`).join(' ');
         const showGoal = p.seasonSetup?.s7 && p.goal;
         html += `
             <div class="participant-row ${isMe ? 'is-me' : ''}" onclick="viewParticipantCalendar('${p.id || p.phone}')" style="cursor: pointer;">
@@ -4994,18 +5045,24 @@ document.addEventListener('DOMContentLoaded', () => {
         supabaseLogin(appState.currentUser.phone).then(result => {
             if (result.success) {
                 const remote = result.data.user;
-                const prevTeamName = appState.currentUser?.teamName;
+                const prevTeams = getUserTeams(appState.currentUser);
                 // Preserve local checkins that haven't synced yet
                 const merged = { ...(remote.checkins || {}), ...(appState.currentUser.checkins || {}) };
                 remote.checkins = merged;
-                // Preserve locally set teamName if DB doesn't have it yet (save race)
-                if (!remote.teamName && prevTeamName) remote.teamName = prevTeamName;
+                // Preserve locally set teams if the DB doesn't have them yet (save race)
+                if (!getUserTeams(remote).length && prevTeams.length) {
+                    remote.teams = prevTeams.slice();
+                    _syncUserTeams(remote);
+                }
                 appState.currentUser = remote;
                 appState.participants = result.data.participants;
                 appState.participants.forEach(p => {
                     if (p.phone === remote.phone) {
                         p.checkins = merged;
-                        if (!p.teamName && prevTeamName) p.teamName = prevTeamName;
+                        if (!getUserTeams(p).length && prevTeams.length) {
+                            p.teams = prevTeams.slice();
+                            p.teamName = prevTeams[0] || null;
+                        }
                     }
                 });
                 saveData();
