@@ -3922,17 +3922,13 @@ function openDayEditor(dateStr, currentStatus) {
     // Show existing workout details for Y days
     const detailsEl = $('quick-log-details');
     if (detailsEl) {
-        const details = currentStatus === 'Y' ? ((appState.currentUser?.checkinDetails || {})[dateStr] || null) : null;
-        if (details && (details.type || details.mood || details.note || details.photo)) {
+        const details = currentStatus === 'Y' ? ((appState.currentUser?.checkinDetails || {})[dateStr] || {}) : null;
+        if (details) {
+            // Logged day: show the photo (1:1) + an Edit Details button. The text chips
+            // (type/mood/note) live inside the Edit Details sheet to keep this view clean.
             detailsEl.style.display = '';
             const metaEl = $('ql-meta');
-            if (metaEl) {
-                const parts = [];
-                if (details.type) parts.push(`${getWorkoutTypeIcon(details.type)} ${details.type}`);
-                if (details.mood) parts.push(details.mood);
-                if (details.note) parts.push(`"${details.note}"`);
-                metaEl.innerHTML = parts.map(p => `<span class="ql-tag">${p}</span>`).join('');
-            }
+            if (metaEl) metaEl.innerHTML = '';
             const photoWrap = $('ql-photo-wrap');
             const photoEl = $('ql-photo');
             if (photoWrap && photoEl) {
