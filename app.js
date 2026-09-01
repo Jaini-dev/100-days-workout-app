@@ -4947,8 +4947,21 @@ function saveSettings() {
 // ============================================
 // INITIALIZATION
 // ============================================
+// Ask the browser to keep our storage from being evicted (keeps users logged in).
+// Supported on Chrome/Edge/Firefox; best-effort no-op elsewhere.
+function requestPersistentStorage() {
+    try {
+        if (navigator.storage && navigator.storage.persist) {
+            navigator.storage.persisted().then(already => {
+                if (!already) navigator.storage.persist().catch(() => {});
+            }).catch(() => {});
+        }
+    } catch (e) { /* ignore */ }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     initDarkMode();
+    requestPersistentStorage();
     loadData();
     cleanupDemoData();
     // If already logged in from localStorage cache, refresh from Supabase in background
