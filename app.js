@@ -2131,9 +2131,10 @@ function renderWeeklyGoal() {
 
 let _wdsDate = null;
 
-function _renderCustomTypeChips(selectedType) {
+function _renderCustomTypeChips(selectedTypes) {
     const container = $('wds-type-chips');
     if (!container) return;
+    const sel = Array.isArray(selectedTypes) ? selectedTypes : (selectedTypes ? [selectedTypes] : []);
     container.querySelectorAll('.wds-chip-custom').forEach(c => c.remove());
     container.querySelectorAll('.wds-chip').forEach(c => c.classList.remove('selected'));
     const addBtn = $('wds-add-type-btn');
@@ -2146,16 +2147,16 @@ function _renderCustomTypeChips(selectedType) {
         btn.textContent = '💪 ' + type;
         container.insertBefore(btn, addBtn);
     });
-    if (selectedType) {
-        const tc = container.querySelector(`[data-value="${selectedType}"]`);
+    sel.forEach(type => {
+        const tc = container.querySelector(`[data-value="${String(type).replace(/"/g, '\\"')}"]`);
         if (tc) tc.classList.add('selected');
-    }
+    });
 }
 
 function showWorkoutDetailsSheet(dateStr) {
     _wdsDate = dateStr;
     const existing = (appState.currentUser?.checkinDetails || {})[dateStr] || {};
-    _renderCustomTypeChips(existing.type);
+    _renderCustomTypeChips(getDayTypes(existing));
     document.querySelectorAll('#wds-mood-chips .wds-chip').forEach(c => c.classList.remove('selected'));
     if (existing.mood) {
         const mc = document.querySelector(`#wds-mood-chips [data-value="${existing.mood}"]`);
@@ -2233,15 +2234,21 @@ function dismissWorkoutDetails() {
     _wdsDate = null;
 }
 
+function _collectWdsTypes() {
+    return [...document.querySelectorAll('#wds-type-chips .wds-chip.selected')]
+        .map(e => e.dataset.value).filter(Boolean);
+}
+
 function _saveWorkoutDetailsQuiet() {
     if (!_wdsDate || !appState.currentUser) return;
-    const typeEl = document.querySelector('#wds-type-chips .wds-chip.selected');
+    const types = _collectWdsTypes();
     const moodEl = document.querySelector('#wds-mood-chips .wds-chip.selected');
     const note = ($('wds-note')?.value || '').trim();
-    if (!typeEl && !moodEl && !note) return;
+    if (!types.length && !moodEl && !note) return;
     if (!appState.currentUser.checkinDetails) appState.currentUser.checkinDetails = {};
     const existing = appState.currentUser.checkinDetails[_wdsDate] || {};
-    const updated = { ...existing, type: typeEl?.dataset.value || existing.type || null, mood: moodEl?.dataset.value || existing.mood || null, note: note || existing.note || null };
+    const finalTypes = types.length ? types : getDayTypes(existing);
+    const updated = { ...existing, types: finalTypes, type: finalTypes[0] || null, mood: moodEl?.dataset.value || existing.mood || null, note: note || existing.note || null };
     appState.currentUser.checkinDetails[_wdsDate] = updated;
     const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
     if (idx >= 0) {
@@ -2253,22 +2260,37 @@ function _saveWorkoutDetailsQuiet() {
     if (appState.currentTab === 'calendar') renderCalendar();
 }
 
+// Normalize a day's workout types to an array (supports old single-type data)
+function getDayTypes(details) {
+    if (!details) return [];
+    if (Array.isArray(details.types)) return details.types.filter(Boolean);
+    if (details.type) return [details.type];
+    return [];
+}
+
 function selectWdsChip(el) {
     const container = el.closest('.wds-chips');
-    if (container) container.querySelectorAll('.wds-chip').forEach(c => c.classList.remove('selected'));
-    el.classList.add('selected');
+    // Workout types are multi-select (a day can include e.g. Yoga + Strength);
+    // mood stays single-select.
+    if (container && container.id === 'wds-type-chips') {
+        el.classList.toggle('selected');
+    } else {
+        if (container) container.querySelectorAll('.wds-chip').forEach(c => c.classList.remove('selected'));
+        el.classList.add('selected');
+    }
 }
 
 function saveWorkoutDetails() {
     if (!_wdsDate || !appState.currentUser) { dismissWorkoutDetails(); return; }
-    const typeEl = document.querySelector('#wds-type-chips .wds-chip.selected');
+    const types = _collectWdsTypes();
     const moodEl = document.querySelector('#wds-mood-chips .wds-chip.selected');
     const note = ($('wds-note')?.value || '').trim();
-    if (!typeEl && !moodEl && !note) { dismissWorkoutDetails(); return; }
+    if (!types.length && !moodEl && !note) { dismissWorkoutDetails(); return; }
 
     if (!appState.currentUser.checkinDetails) appState.currentUser.checkinDetails = {};
     const existing = appState.currentUser.checkinDetails[_wdsDate] || {};
-    const updated = { ...existing, type: typeEl?.dataset.value || existing.type || null, mood: moodEl?.dataset.value || existing.mood || null, note: note || existing.note || null };
+    const finalTypes = types.length ? types : getDayTypes(existing);
+    const updated = { ...existing, types: finalTypes, type: finalTypes[0] || null, mood: moodEl?.dataset.value || existing.mood || null, note: note || existing.note || null };
     appState.currentUser.checkinDetails[_wdsDate] = updated;
     const idx = appState.participants.findIndex(p => p.phone === appState.currentUser.phone);
     if (idx >= 0) {
@@ -3891,7 +3913,8 @@ function renderCalendar() {
             const clickable = canEdit ? 'clickable' : '';
             const onClick = clickable ? `onclick="openDayEditor('${dateStr}', '${checkin || ''}')"` : '';
             const details = checkin === 'Y' ? ((user.checkinDetails || {})[dateStr] || null) : null;
-            const detailBadge = details?.type && !details?.photo ? `<span class="cal-detail-icon" title="${details.type}">${getWorkoutTypeIcon(details.type)}</span>` : '';
+            const dayTypes = getDayTypes(details);
+            const detailBadge = dayTypes.length && !details?.photo ? `<span class="cal-detail-icon" title="${_htmlEsc(dayTypes.join(', '))}">${getWorkoutTypeIcon(dayTypes[0])}</span>` : '';
             const hasPhoto = !!(details?.photo);
             const photoAttr = hasPhoto ? `data-photo-path="${details.photo}"` : '';
             const photoClass = hasPhoto ? ' has-photo' : '';
@@ -3988,10 +4011,10 @@ function openDayEditor(dateStr, currentStatus) {
                 const parts = [];
                 if (currentStatus === 'R') parts.push('🧘 Rest day');
                 else if (currentStatus === 'N') parts.push('😴 Skipped');
-                if (details.type) parts.push(`${getWorkoutTypeIcon(details.type)} ${details.type}`);
+                getDayTypes(details).forEach(t => parts.push(`${getWorkoutTypeIcon(t)} ${t}`));
                 if (details.mood) parts.push(details.mood);
                 if (details.note) parts.push(`"${details.note}"`);
-                metaEl.innerHTML = parts.map(p => `<span class="ql-tag">${p}</span>`).join('');
+                metaEl.innerHTML = parts.map(p => `<span class="ql-tag">${_htmlEsc(p)}</span>`).join('');
             }
             const photoWrap = $('ql-photo-wrap');
             const photoEl = $('ql-photo');
