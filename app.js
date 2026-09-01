@@ -2805,11 +2805,12 @@ function renderLeaderboard(category = 'thisWeek') {
                     primaryValue = p.totalWorkouts;
             }
 
-            // Award medals only to top-3 who have actual progress; otherwise show a
-            // plain sequential position (avoids everyone being "🥇 #1" when all at 0)
+            // Award medals only to top-3 who have actual progress; those with real
+            // progress below top-3 get their rank number. Anyone still at 0 is genuinely
+            // unranked (everyone's equal), so show a neutral dash rather than a fake position.
             const metricNum = typeof primaryValue === 'number' ? primaryValue : parseInt(primaryValue) || 0;
             const hasProgress = metricNum > 0 || (p.totalWorkouts || 0) > 0;
-            const rankDisplay = (hasProgress && rank <= 3) ? medals[rank - 1] : (hasProgress ? rank : (i + 1));
+            const rankDisplay = !hasProgress ? '–' : (rank <= 3 ? medals[rank - 1] : rank);
 
             html += `
                 <tr class="${isMe ? 'lb-row-me' : ''}">
