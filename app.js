@@ -1949,18 +1949,17 @@ function updateDashboard() {
         motivationEl.textContent = `"${quote}"`;
     }
 
-    // Calculate streak
+    // Streak is still computed but shown in just one place (the stats grid)
     const streak = calculateStreak(user);
     user.streak = streak;
 
-    const streakEl = $('streak-count');
-    if (streakEl) streakEl.textContent = streak;
+    // Green hero card secondary now shows THIS WEEK's workouts, not the streak
+    const weeklyWorkouts = calculateWeeklyWorkouts(user);
+    const weekEl = $('week-count');
+    if (weekEl) weekEl.textContent = weeklyWorkouts;
 
     const flamesEl = $('streak-flames');
-    if (flamesEl) {
-        const flames = '🔥'.repeat(Math.min(streak, 10));
-        flamesEl.textContent = flames;
-    }
+    if (flamesEl) flamesEl.textContent = '🔥'.repeat(Math.min(streak, 10));
 
     const streakCard = $('streak-card');
     if (streakCard) {
@@ -1972,28 +1971,19 @@ function updateDashboard() {
 
     const msgEl = $('streak-message');
     if (msgEl) {
-        if (streak >= 30) {
-            msgEl.textContent = "LEGENDARY! You're unstoppable!";
-        } else if (streak >= 14) {
-            msgEl.textContent = "Two weeks strong! Keep dominating!";
-        } else if (streak >= 7) {
-            msgEl.textContent = "One week streak! You're on fire!";
-        } else if (streak >= 3) {
-            msgEl.textContent = getRandomQuote('streak');
-        } else if (streak > 0) {
-            msgEl.textContent = "Great start! Keep it going!";
-        } else {
-            msgEl.textContent = "Log today and start your streak!";
-        }
+        if (totalWorkouts === 0) msgEl.textContent = "Log your first workout!";
+        else if (weeklyWorkouts >= 5) msgEl.textContent = "Crushing it this week! 🔥";
+        else if (weeklyWorkouts > 0) msgEl.textContent = "Nice — keep the momentum going!";
+        else msgEl.textContent = "New week — let's move!";
     }
 
     // Stats
     const totalEl = $('total-workouts');
     if (totalEl) totalEl.textContent = totalWorkouts;
 
-    // Best streak in the secondary stat card
-    const bsEl = $('best-streak-stat');
-    if (bsEl) bsEl.textContent = calculateBestStreak(user);
+    // Streak — shown once here, beside completion rate
+    const streakStatEl = $('streak-stat');
+    if (streakStatEl) streakStatEl.textContent = streak;
 
     const rate = currentDay > 0 ? Math.round((totalWorkouts / currentDay) * 100) : 0;
     const rateEl = $('completion-rate');
@@ -2028,9 +2018,9 @@ function updateDashboard() {
             rankEl.textContent = '#' + rank;
             rankLabel.textContent = 'Your Rank';
         } else {
-            // Fallback - show best streak
-            rankEl.textContent = calculateBestStreak(user) || 0;
-            rankLabel.textContent = 'Best Streak';
+            // Fallback - show total workouts (streak lives only in its own stat)
+            rankEl.textContent = totalWorkouts;
+            rankLabel.textContent = 'Workouts';
         }
     }
 
@@ -2045,8 +2035,11 @@ function updateDashboard() {
     // Personal progress section (replaces workouts needed)
     renderPersonalProgress(user);
 
-    // Weekly goal progress strip
+    // Weekly goal progress strip (top) + "set a goal" prompt below days-completed
     renderWeeklyGoal();
+    const hasWeeklyGoal = !!(user.seasonSetup?.weeklyGoalText || user.weeklyGoal);
+    const setGoalBtn = $('dash-set-goal');
+    if (setGoalBtn) setGoalBtn.style.display = hasWeeklyGoal ? 'none' : 'block';
 
     // Check-in status
     const todayDate = getTodayString();
@@ -2315,24 +2308,28 @@ function renderPersonalProgress(user) {
     const container = $('personal-progress-section');
     if (!container) return;
 
-    const currentStreak = calculateStreak(user);
-    const bestStreak = calculateBestStreak(user);
     const weeklyStats = calculateWeeklyImprovement(user);
     const totalWorkouts = calculateTotalWorkouts(user);
+
+    // Workouts in the current calendar month (non-streak context stat)
+    const nowM = getDateInTimezone(user?.timezone || 'Asia/Kolkata');
+    const ymPrefix = `${nowM.getFullYear()}-${String(nowM.getMonth() + 1).padStart(2, '0')}`;
+    let thisMonth = 0;
+    if (user.checkins) Object.keys(user.checkins).forEach(d => { if (d.startsWith(ymPrefix) && user.checkins[d] === 'Y') thisMonth++; });
 
     let progressHtml = '<div class="personal-progress-card">';
     progressHtml += '<div class="progress-header">📈 Your Progress</div>';
     progressHtml += '<div class="progress-stats">';
 
-    // This week vs streak (total days is now hero card)
+    // This week + this month (streak lives only in the stats grid now)
     progressHtml += `
         <div class="progress-stat">
             <span class="progress-value">${weeklyStats.thisWeek}</span>
             <span class="progress-label">This Week 💪</span>
         </div>
         <div class="progress-stat">
-            <span class="progress-value">${currentStreak}</span>
-            <span class="progress-label">🔥 Streak</span>
+            <span class="progress-value">${thisMonth}</span>
+            <span class="progress-label">This Month 📆</span>
         </div>
     `;
 
@@ -2720,8 +2717,7 @@ function getTiedRank(sorted, index, category) {
 function getCategoryTitle(category) {
     switch (category) {
         case 'thisWeek': return '🔥 Most Active This Week';
-        case 'comeback': return '💪 Best Comebacks';
-        case 'streaks': return '⚡ Streak Builders';
+        case 'all': return '🏆 All-Time Leaders';
         default: return '🏆 Leaderboard';
     }
 }
@@ -2729,8 +2725,7 @@ function getCategoryTitle(category) {
 function getCategoryDescription(category) {
     switch (category) {
         case 'thisWeek': return 'Who\'s crushing it this week?';
-        case 'comeback': return 'Heroes who bounced back after a break';
-        case 'streaks': return 'Building consistency day by day';
+        case 'all': return 'Total workouts logged this season';
         default: return '';
     }
 }
@@ -2747,7 +2742,7 @@ function renderLeaderboard(category = 'thisWeek') {
         const categoryTitle = $('category-title');
         const categoryDesc = $('category-desc');
         if (categoryTitle) categoryTitle.textContent = '👥 Team Battle';
-        if (categoryDesc) categoryDesc.textContent = 'Click any team to see members and today\'s activity';
+        if (categoryDesc) categoryDesc.textContent = 'Ranked by total workouts logged by all members. Tap a team for details.';
         renderTeamsLeaderboard();
         return;
     }
@@ -2982,7 +2977,7 @@ function showTeamDetail(teamName) {
     let html = `
         <div class="tps-team-stats-row">
             <div class="tps-team-stat-box"><span class="tps-tsb-val">${rank ? '#' + rank : '-'}</span><span class="tps-tsb-lbl">Team Rank</span></div>
-            <div class="tps-team-stat-box"><span class="tps-tsb-val">${totalWorkouts}</span><span class="tps-tsb-lbl">Total Days</span></div>
+            <div class="tps-team-stat-box"><span class="tps-tsb-val">${totalWorkouts}</span><span class="tps-tsb-lbl">Workouts</span></div>
             <div class="tps-team-stat-box"><span class="tps-tsb-val">${loggedToday}/${members.length}</span><span class="tps-tsb-lbl">Today</span></div>
         </div>
         <div class="tps-section-label" style="margin-top:16px;">Members</div>
@@ -3184,7 +3179,7 @@ function _tdcCardHtml(teamName, allTeams) {
         <div class="tdc-header">
             <div class="tdc-team-info">
                 <div class="tdc-team-name">👥 ${_htmlEsc(teamName)}</div>
-                <div class="tdc-team-sub">${teamRank ? `#${teamRank} team · ` : ''}${totalWorkouts} total days · ${teamMembers.length} members</div>
+                <div class="tdc-team-sub">${teamRank ? `#${teamRank} team · ` : ''}${totalWorkouts} workouts · ${teamMembers.length} members</div>
             </div>
             <button class="tdc-view-btn" onclick="showTab('leaderboard');setTimeout(()=>renderLeaderboard('teams'),150);">Leaderboard →</button>
         </div>
@@ -3229,7 +3224,7 @@ function renderTeamsLeaderboard() {
                     <div class="lb-team-members">${team.members.length} member${team.members.length > 1 ? 's' : ''} · ${firstNames}</div>
                 </div>
                 <div class="lb-team-stats">
-                    <div><span class="lb-team-stat-val">${team.total}</span> <span class="lb-team-stat-lbl">days</span></div>
+                    <div><span class="lb-team-stat-val">${team.total}</span> <span class="lb-team-stat-lbl">workouts</span></div>
                     <div><span class="lb-team-stat-val lb-team-week">${team.thisWeek}</span> <span class="lb-team-stat-lbl">this wk</span></div>
                 </div>
             </div>`;
@@ -3436,17 +3431,138 @@ async function _loadS6HistoryInto(container) {
     list.forEach((p, i) => {
         const isMe = appState.currentUser?.phone === p.phone;
         const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `<span style="font-size:13px;color:var(--text-secondary);">${i + 1}</span>`;
-        html += `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border-color)${isMe ? ';background:rgba(5,150,105,0.06);border-radius:10px;padding-left:8px;' : ''}">
+        const nameEsc = _htmlEsc(p.name).replace(/'/g, "\\'");
+        html += `<div onclick="showS6ParticipantCalendar('${p.phone}','${nameEsc}')" style="display:flex;align-items:center;gap:12px;padding:12px 8px;border-bottom:1px solid var(--border-color);cursor:pointer;border-radius:10px;${isMe ? 'background:rgba(5,150,105,0.06);' : ''}">
             <div style="width:32px;text-align:center;font-size:18px;">${medal}</div>
             <div style="width:38px;height:38px;border-radius:50%;background:var(--bg-subtle);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:var(--primary);">${(p.name||'?').charAt(0).toUpperCase()}</div>
             <div style="flex:1;">
                 <div style="font-weight:700;color:var(--text-primary);font-size:15px;">${_htmlEsc(p.name)}${isMe ? ' <span style="font-size:11px;background:var(--primary);color:white;padding:1px 6px;border-radius:8px;">You</span>' : ''}</div>
-                <div style="font-size:12px;color:var(--text-secondary);">Season 6 workouts</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Season 6 workouts · tap for calendar</div>
             </div>
             <div style="font-size:20px;font-weight:800;color:var(--primary);">${p.total}</div>
+            <span style="color:var(--text-secondary);font-size:18px;">›</span>
         </div>`;
     });
     container.innerHTML = html;
+}
+
+async function showS6ParticipantCalendar(phone, name) {
+    let overlay = $('s6-cal-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 's6-cal-overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:2100;background:var(--bg-page);overflow-y:auto;display:flex;flex-direction:column;';
+        document.body.appendChild(overlay);
+    }
+    overlay.style.display = 'flex';
+    overlay.innerHTML = `
+        <div style="display:flex;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border-color);gap:12px;position:sticky;top:0;background:var(--bg-page);z-index:1;">
+            <button onclick="document.getElementById('s6-cal-overlay').remove();" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-primary);line-height:1;">←</button>
+            <h2 style="margin:0;font-size:18px;font-weight:800;color:var(--text-primary);">📜 ${_htmlEsc(name)} · Season 6</h2>
+        </div>
+        <div id="s6-cal-body" style="padding:16px 20px;flex:1;"><p style="color:var(--text-secondary);text-align:center;padding:40px 0;">Loading…</p></div>`;
+    const sb = getSB();
+    const { data: rows } = await sb.from('checkins').select('date,status').eq('phone', phone).lt('date', challengeSettings.startDate);
+    const body = $('s6-cal-body');
+    if (!body) return;
+    const byDate = {};
+    (rows || []).forEach(r => { byDate[r.date] = r.status; });
+    const dates = Object.keys(byDate).sort();
+    if (!dates.length) { body.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:40px 0;">No Season 6 activity</p>'; return; }
+    const yCount = Object.values(byDate).filter(s => s === 'Y').length;
+    // Build month grids from first to last month present
+    const first = new Date(dates[0] + 'T00:00:00');
+    const last = new Date(dates[dates.length - 1] + 'T00:00:00');
+    const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    let html = `<div style="text-align:center;margin-bottom:16px;color:var(--text-secondary);font-size:14px;">💪 <b style="color:var(--primary);">${yCount}</b> workout days in Season 6</div>`;
+    let y = first.getFullYear(), m = first.getMonth();
+    while (y < last.getFullYear() || (y === last.getFullYear() && m <= last.getMonth())) {
+        html += _s6MonthGrid(y, m, byDate, monthNames);
+        m++; if (m > 11) { m = 0; y++; }
+    }
+    body.innerHTML = html;
+}
+
+function _s6MonthGrid(year, month, byDate, monthNames) {
+    const firstDay = new Date(year, month, 1);
+    const startWeekday = (firstDay.getDay() + 6) % 7; // Mon=0
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    let cells = '';
+    for (let i = 0; i < startWeekday; i++) cells += `<div></div>`;
+    for (let d = 1; d <= daysInMonth; d++) {
+        const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const s = byDate[ds];
+        const bg = s === 'Y' ? 'background:linear-gradient(135deg,#059669,#047857);color:#fff;'
+            : s === 'R' ? 'background:rgba(14,165,233,0.25);color:var(--text-primary);'
+            : s === 'N' ? 'background:rgba(239,68,68,0.18);color:var(--text-primary);'
+            : 'background:var(--bg-subtle);color:var(--text-secondary);';
+        cells += `<div style="aspect-ratio:1;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;${bg}">${d}</div>`;
+    }
+    return `<div style="margin-bottom:20px;">
+        <div style="font-weight:700;color:var(--text-primary);margin-bottom:8px;">${monthNames[month]} ${year}</div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px;">
+            ${['M','T','W','T','F','S','S'].map(d => `<div style="text-align:center;font-size:10px;color:var(--text-secondary);">${d}</div>`).join('')}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;">${cells}</div>
+    </div>`;
+}
+
+async function showMyWorkouts() {
+    let overlay = $('my-workouts-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'my-workouts-overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:2000;background:var(--bg-page);overflow-y:auto;display:flex;flex-direction:column;';
+        document.body.appendChild(overlay);
+    }
+    overlay.style.display = 'flex';
+    overlay.innerHTML = `
+        <div style="display:flex;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border-color);gap:12px;position:sticky;top:0;background:var(--bg-page);z-index:1;">
+            <button onclick="document.getElementById('my-workouts-overlay').remove();" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-primary);line-height:1;">←</button>
+            <h2 style="margin:0;font-size:18px;font-weight:800;color:var(--text-primary);">📸 My Workouts</h2>
+        </div>
+        <div id="my-workouts-body" style="padding:16px 20px;flex:1;"></div>`;
+    const body = $('my-workouts-body');
+    const user = appState.currentUser;
+    const checkins = user?.checkins || {};
+    const detailsMap = user?.checkinDetails || {};
+    // Y days within the season, newest first
+    const days = Object.keys(checkins)
+        .filter(d => checkins[d] === 'Y' && d >= challengeSettings.startDate)
+        .sort().reverse();
+    if (!days.length) {
+        body.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:40px 0;">No workouts logged yet.<br>Log a workout and it\'ll show up here!</p>';
+        return;
+    }
+    let html = '';
+    days.forEach(ds => {
+        const det = detailsMap[ds] || {};
+        const dateObj = new Date(ds + 'T00:00:00');
+        const dateLabel = dateObj.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
+        const typeChips = getDayTypes(det).map(t => `<span class="mw-chip">${getWorkoutTypeIcon(t)} ${_htmlEsc(t)}</span>`).join('');
+        const moodChip = det.mood ? `<span class="mw-chip">${_htmlEsc(det.mood)}</span>` : '';
+        const note = det.note ? `<div class="mw-note">"${_htmlEsc(det.note)}"</div>` : '';
+        const photo = det.photo ? `<div class="mw-photo" data-photo="${_htmlEsc(det.photo)}"></div>` : '';
+        html += `<div class="mw-card">
+            <div class="mw-date">✅ ${dateLabel}</div>
+            ${photo}
+            ${(typeChips || moodChip) ? `<div class="mw-chips">${typeChips}${moodChip}</div>` : ''}
+            ${note}
+            ${(!typeChips && !moodChip && !note && !photo) ? '<div class="mw-note" style="opacity:.6;">No details added</div>' : ''}
+        </div>`;
+    });
+    body.innerHTML = html;
+    // Resolve photo signed URLs
+    const photoEls = [...body.querySelectorAll('.mw-photo')];
+    const paths = photoEls.map(e => e.dataset.photo).filter(Boolean);
+    if (paths.length) {
+        try {
+            const { data: signed } = await getSB().storage.from(CONFIG.CHECKIN_PHOTO_BUCKET).createSignedUrls(paths, 7 * 24 * 3600);
+            const map = {};
+            (signed || []).forEach(s => { if (s.signedUrl) map[s.path] = s.signedUrl; });
+            photoEls.forEach(e => { const u = map[e.dataset.photo]; if (u) e.style.backgroundImage = `url('${u}')`; });
+        } catch (e) { /* ignore */ }
+    }
 }
 
 async function loadS6History() {
@@ -3504,16 +3620,16 @@ function renderParticipantsList(participants) {
 
         const avatarStyle = p.profilePhotoUrl ? `background-image:url('${p.profilePhotoUrl}');` : '';
         const avatarInitial = p.profilePhotoUrl ? '' : (p.name || '?').charAt(0).toUpperCase();
-        const teamBadge = getUserTeams(p).map(t => `<span class="pr-team-badge">👥 ${_htmlEsc(t)}</span>`).join(' ');
+        const teams = getUserTeams(p);
+        const teamsInline = teams.length ? ` · <span class="pr-teams">👥 ${_htmlEsc(teams.join(', '))}</span>` : '';
         const showGoal = p.seasonSetup?.s7 && p.goal;
         html += `
             <div class="participant-row ${isMe ? 'is-me' : ''}" onclick="viewParticipantCalendar('${p.id || p.phone}')" style="cursor: pointer;">
-                <div class="rank-num ${rankClass}">${rank}</div>
                 <div class="pr-avatar" style="${avatarStyle}">${avatarInitial}</div>
                 <div class="participant-info">
                     <div class="participant-name">${p.name}${isMe ? ' (You)' : ''} ${todayIcon}</div>
                     ${showGoal ? `<div class="participant-goal">🎯 ${p.goal}</div>` : ''}
-                    <div class="participant-stats">🔥 ${p.streak} streak · This week: ${p.weeklyWorkouts} ${teamBadge}</div>
+                    <div class="participant-stats">This week: ${p.weeklyWorkouts}${teamsInline}</div>
                 </div>
                 <div class="participant-workouts">${p.totalWorkouts}</div>
             </div>
@@ -3608,10 +3724,6 @@ async function viewParticipantCalendar(identifier) {
             <div class="modal-stat">
                 <span class="modal-stat-value">${totalWorkouts}</span>
                 <span class="modal-stat-label">Total Workouts</span>
-            </div>
-            <div class="modal-stat">
-                <span class="modal-stat-value">${streak} 🔥</span>
-                <span class="modal-stat-label">Current Streak</span>
             </div>
             <div class="modal-stat">
                 <span class="modal-stat-value">${weeklyWorkouts}</span>
@@ -5302,6 +5414,9 @@ window.joinTeam = joinTeam;
 window.leaveTeam = leaveTeam;
 window.confirmLeaveTeam = confirmLeaveTeam;
 window.showS6HistoryModal = showS6HistoryModal;
+window.showS6ParticipantCalendar = showS6ParticipantCalendar;
+window.showMyWorkouts = showMyWorkouts;
+window.toggleSidebar = toggleSidebar;
 window.deleteTestAccounts = deleteTestAccounts;
 window.dismissWorkoutDetails = dismissWorkoutDetails;
 window.selectWdsChip = selectWdsChip;

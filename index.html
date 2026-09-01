@@ -188,9 +188,8 @@
                     </div>
                 </div>
                 <div class="header-right">
-                    <button class="icon-btn" onclick="refreshDashboard()" title="Refresh">🔄</button>
                     <button class="icon-btn" id="dark-toggle" onclick="toggleDarkMode()" title="Toggle dark mode">🌙</button>
-                    <button class="icon-btn" id="settings-btn" onclick="showSettings()">⚙️</button>
+                    <button class="icon-btn" id="hamburger-btn" onclick="toggleSidebar()" title="Menu" aria-label="Menu">☰</button>
                 </div>
             </div>
 
@@ -217,16 +216,13 @@
                 <div class="streak-number" id="total-workouts">0</div>
                 <div class="streak-label">Days Completed 💪</div>
                 <div class="streak-secondary" id="streak-secondary">
-                    <span id="streak-badge">🔥 <span id="streak-count">0</span> day streak</span>
+                    <span id="week-badge">💪 <span id="week-count">0</span> workouts this week</span>
                 </div>
                 <div class="streak-message" id="streak-message">Let's get moving!</div>
             </div>
 
-            <!-- Last Season Recap (hidden until S6 data loaded) -->
-            <div id="last-season-card" class="last-season-card" style="display:none;"></div>
-
-            <!-- Team Dashboard Card (shown when user has a team) -->
-            <div id="team-dashboard-card" class="team-dashboard-card" style="display:none;"></div>
+            <!-- Set weekly goal (shows only when no goal is set) -->
+            <button id="dash-set-goal" class="dash-set-goal" style="display:none;" onclick="showSettings()">🎯 Set a weekly goal</button>
 
             <!-- Today's Check-in -->
             <div class="checkin-section" id="checkin-section">
@@ -269,6 +265,9 @@
                 </div>
             </div>
 
+            <!-- Team Dashboard Card (shown when user has a team) -->
+            <div id="team-dashboard-card" class="team-dashboard-card" style="display:none;"></div>
+
             <!-- Personal Progress Section -->
             <div id="personal-progress-section" class="personal-progress-section">
                 <!-- Dynamically rendered -->
@@ -282,8 +281,8 @@
             <!-- Stats Cards -->
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-value" id="best-streak-stat">0</div>
-                    <div class="stat-label">Best Streak 🏅</div>
+                    <div class="stat-value" id="streak-stat">0</div>
+                    <div class="stat-label">🔥 Streak</div>
                 </div>
                 <div class="stat-card clickable-card" onclick="showTab('summary')">
                     <div class="stat-value" id="completion-rate">0%</div>
@@ -318,6 +317,9 @@
                 </div>
                 <div id="mini-leaderboard"></div>
             </div>
+
+            <!-- Last Season Recap (hidden until S6 data loaded) -->
+            <div id="last-season-card" class="last-season-card" style="display:none;"></div>
         </div>
     </div>
 
@@ -333,8 +335,7 @@
             <!-- Leaderboard Filters -->
             <div class="lb-filter-bar">
                 <button class="lb-filter-btn active" data-category="thisWeek">This Week</button>
-                <button class="lb-filter-btn" data-category="comeback">Comeback</button>
-                <button class="lb-filter-btn" data-category="streaks">Streaks</button>
+                <button class="lb-filter-btn" data-category="all">All Time</button>
                 <button class="lb-filter-btn" data-category="teams">👥 Teams</button>
             </div>
 
@@ -989,12 +990,6 @@
         </div>
     </div>
 
-    <!-- Hamburger Menu Button -->
-    <button class="hamburger-btn" id="hamburger-btn" onclick="toggleSidebar()">
-        <span class="hamburger-line"></span>
-        <span class="hamburger-line"></span>
-        <span class="hamburger-line"></span>
-    </button>
 
     <!-- Sidebar Overlay -->
     <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
@@ -1003,7 +998,7 @@
     <nav class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <div class="sidebar-logo">💪</div>
-            <h3>100 Days</h3>
+            <h3>100 Days S7</h3>
             <button class="sidebar-close" onclick="closeSidebar()">×</button>
         </div>
         <div class="sidebar-menu">
@@ -1023,9 +1018,9 @@
                 <span class="sidebar-icon">📅</span>
                 <span class="sidebar-text">Calendar</span>
             </a>
-            <a href="#" class="sidebar-item" data-tab="summary" onclick="sidebarNav(event, 'summary')">
-                <span class="sidebar-icon">📊</span>
-                <span class="sidebar-text">Share Progress</span>
+            <a href="#" class="sidebar-item" onclick="closeSidebar();showMyWorkouts();">
+                <span class="sidebar-icon">📸</span>
+                <span class="sidebar-text">My Workouts</span>
             </a>
             <a href="#" class="sidebar-item" data-tab="halloffame" onclick="sidebarNav(event, 'halloffame')">
                 <span class="sidebar-icon">🏆</span>
