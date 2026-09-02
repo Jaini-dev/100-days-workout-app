@@ -3108,6 +3108,9 @@ function showTeamDetail(teamName) {
     const rankIdx = allTeams.findIndex(t => t.name.toLowerCase() === teamName.toLowerCase());
     const rank = rankIdx >= 0 ? rankIdx + 1 : null;
 
+    const iAmAdmin = isTeamAdmin(appState.currentUser, teamName);
+    const teamEsc = _htmlEsc(teamName).replace(/'/g, "\\'");
+
     const body = $('tps-body');
     let html = `
         <div class="tps-team-stats-row">
@@ -3115,20 +3118,40 @@ function showTeamDetail(teamName) {
             <div class="tps-team-stat-box"><span class="tps-tsb-val">${totalWorkouts}</span><span class="tps-tsb-lbl">Workouts</span></div>
             <div class="tps-team-stat-box"><span class="tps-tsb-val">${loggedToday}/${members.length}</span><span class="tps-tsb-lbl">Today</span></div>
         </div>
-        <div class="tps-section-label" style="margin-top:16px;">Members</div>
+        <div class="tps-section-row" style="margin-top:16px;">
+            <div class="tps-section-label">Members (${members.length})</div>
+            ${isMyTeam ? `<button class="tps-add-btn" onclick="showAddTeamMembers('${teamEsc}')">＋ Add members</button>` : ''}
+        </div>
         <div class="tps-member-list">`;
 
+    // admins first, then members
+    members.sort((a, b) => (getUserTeamRole(b, teamName) === 'admin' ? 1 : 0) - (getUserTeamRole(a, teamName) === 'admin' ? 1 : 0));
     members.forEach(m => {
         const isMe = isCurrentUser(m);
         const avatarStyle = m.profilePhotoUrl ? `background-image:url('${m.profilePhotoUrl}');background-size:cover;background-position:center;` : '';
         const initial = m.profilePhotoUrl ? '' : (m.name || '?').charAt(0).toUpperCase();
         const status = m.checkins ? m.checkins[todayDate] : m.todayStatus;
         const statusIcon = status === 'Y' ? '✅' : status === 'R' ? '🧘' : status === 'N' ? '❌' : '⏳';
+        const memberIsAdmin = getUserTeamRole(m, teamName) === 'admin';
+        const adminBadge = memberIsAdmin ? '<span class="tps-admin-badge">👑 Admin</span>' : '';
+        // Admin controls for other members
+        let controls = '';
+        if (iAmAdmin && !isMe) {
+            if (memberIsAdmin) {
+                controls = `<button class="tps-mbtn" onclick="removeTeamAdmin('${m.phone}','${teamEsc}')">Dismiss admin</button>`;
+            } else {
+                controls = `<button class="tps-mbtn" onclick="makeTeamAdmin('${m.phone}','${teamEsc}')">Make admin</button>`;
+            }
+            controls += `<button class="tps-mbtn tps-mbtn-danger" onclick="removeMemberFromTeam('${m.phone}','${teamEsc}')">Remove</button>`;
+        }
         html += `<div class="tps-member-row${isMe ? ' tps-member-me' : ''}">
             <div class="tps-member-avatar" style="${avatarStyle}">${initial}</div>
-            <div class="tps-member-name">${_htmlEsc(m.name)}${isMe ? ' <span class="tps-you-tag">(You)</span>' : ''}</div>
+            <div class="tps-member-main">
+                <div class="tps-member-name">${_htmlEsc(m.name)}${isMe ? ' <span class="tps-you-tag">(You)</span>' : ''} ${adminBadge}</div>
+                ${controls ? `<div class="tps-member-controls">${controls}</div>` : ''}
+            </div>
             <div class="tps-member-today">${statusIcon}</div>
-            <div class="tps-member-stat">${m.totalWorkouts} days</div>
+            <div class="tps-member-stat">${m.totalWorkouts}d</div>
         </div>`;
     });
 
@@ -3139,6 +3162,43 @@ function showTeamDetail(teamName) {
         html += `<button class="tps-join-btn" data-team="${_htmlEsc(teamName)}" onclick="joinTeam(this.dataset.team)">Join ${_htmlEsc(teamName)} 👥</button>`;
     }
     body.innerHTML = html;
+}
+
+// Add-members picker: anyone in the team can add any S7 participant not yet in it
+function showAddTeamMembers(teamName) {
+    _tpsSetHeader(true, 'Add members');
+    const teamEsc = _htmlEsc(teamName).replace(/'/g, "\\'");
+    const candidates = getSortedParticipants('all')
+        .filter(p => p.seasonSetup?.s7 && !userInTeam(p, teamName))
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    const body = $('tps-body');
+    if (!body) return;
+    let html = `<div class="tps-section-label" style="margin-bottom:10px;">Add to "${_htmlEsc(teamName)}"</div>
+        <input id="tps-add-search" class="tps-add-search" type="text" placeholder="Search by name..." oninput="_filterAddMembers()">
+        <div id="tps-add-list" class="tps-add-list">`;
+    if (!candidates.length) {
+        html += `<p class="empty-message">Everyone is already in this team 🎉</p>`;
+    } else {
+        candidates.forEach(p => {
+            const avatarStyle = p.profilePhotoUrl ? `background-image:url('${p.profilePhotoUrl}');background-size:cover;background-position:center;` : '';
+            const initial = p.profilePhotoUrl ? '' : (p.name || '?').charAt(0).toUpperCase();
+            html += `<div class="tps-add-row" data-name="${_htmlEsc((p.name || '').toLowerCase())}">
+                <div class="tps-member-avatar" style="${avatarStyle}">${initial}</div>
+                <div class="tps-member-name">${_htmlEsc(p.name)}</div>
+                <button class="tps-add-one" onclick="addMemberToTeam('${p.phone}','${teamEsc}')">Add</button>
+            </div>`;
+        });
+    }
+    html += `</div><button class="tps-create-btn" style="margin-top:14px;" onclick="showTeamDetail('${teamEsc}')">← Back to team</button>`;
+    body.innerHTML = html;
+    setTimeout(() => $('tps-add-search')?.focus(), 80);
+}
+
+function _filterAddMembers() {
+    const q = ($('tps-add-search')?.value || '').toLowerCase().trim();
+    document.querySelectorAll('#tps-add-list .tps-add-row').forEach(row => {
+        row.style.display = (!q || (row.dataset.name || '').includes(q)) ? '' : 'none';
+    });
 }
 
 function showCreateTeam() {
@@ -3184,6 +3244,9 @@ function joinTeam(teamName) {
     }
     teams.push(name);
     u.teams = teams;
+    // First member of a brand-new team becomes its admin; otherwise a member
+    const otherMembers = _teamMembersOf(name).filter(p => p.phone !== u.phone);
+    _setTeamRole(u, name, otherMembers.length === 0 ? 'admin' : (getUserTeamRole(u, name) || 'member'));
     _syncUserTeams(u);
     _syncParticipantTeams(u);
     saveData();
@@ -3210,12 +3273,21 @@ function confirmLeaveTeam(teamName) {
 function leaveTeam(teamName) {
     if (!appState.currentUser) return;
     const u = appState.currentUser;
-    const target = (teamName || getUserTeams(u)[0] || '').trim().toLowerCase();
-    u.teams = getUserTeams(u).filter(t => t.trim().toLowerCase() !== target);
+    const key = (teamName || getUserTeams(u)[0] || '').trim().toLowerCase();
+    const wasAdmin = getUserTeamRole(u, key) === 'admin';
+    // If the only admin leaves, promote the next remaining member (WhatsApp-style)
+    let promote = null;
+    if (wasAdmin && _teamAdminCount(key) <= 1) {
+        const remaining = _teamMembersOf(key).filter(p => p.phone !== u.phone);
+        if (remaining.length) promote = appState.participants.find(p => p.phone === remaining[0].phone);
+    }
+    u.teams = getUserTeams(u).filter(t => t.trim().toLowerCase() !== key);
+    _setTeamRole(u, key, null);
     _syncUserTeams(u);
     _syncParticipantTeams(u);
     saveData();
     supabaseSaveProfile(u).catch(() => {});
+    if (promote) { _setTeamRole(promote, key, 'admin'); _persistOtherParticipant(promote); }
     _updateTeamDisplay();
     updateDashboard();  // refresh nudge + team cards immediately (no reload needed)
     showToast(`Left team "${teamName}"`, 'success');
@@ -3248,6 +3320,106 @@ function _syncUserTeams(u) {
     u.teamName = u.teams[0] || null;
     if (!u.seasonSetup) u.seasonSetup = {};
     u.seasonSetup.teams = u.teams.slice();
+}
+
+// ---- Team roles (admin / member) ----
+// Each member records their own role per team in season_setup.teamRoles.
+// The creator (first member) is admin. Anyone can add members; only admins
+// can remove members or promote/demote admins.
+function _teamKey(name) { return (name || '').trim().toLowerCase(); }
+function getUserTeamRole(u, name) { return (u?.seasonSetup?.teamRoles || {})[_teamKey(name)] || null; }
+function _teamMembersOf(name) {
+    return getSortedParticipants('all').filter(p => p.seasonSetup?.s7 && userInTeam(p, name));
+}
+function _teamAdminCount(name) {
+    return _teamMembersOf(name).filter(m => getUserTeamRole(m, name) === 'admin').length;
+}
+function isTeamAdmin(u, name) {
+    if (!u || !userInTeam(u, name)) return false;
+    if (getUserTeamRole(u, name) === 'admin') return true;
+    // Legacy fallback: a team with no admin at all stays manageable by any member
+    return _teamAdminCount(name) === 0;
+}
+function _setTeamRole(participant, name, role) {
+    if (!participant.seasonSetup) participant.seasonSetup = {};
+    if (!participant.seasonSetup.teamRoles) participant.seasonSetup.teamRoles = {};
+    const k = _teamKey(name);
+    if (role) participant.seasonSetup.teamRoles[k] = role;
+    else delete participant.seasonSetup.teamRoles[k];
+}
+
+// Persist another participant's team membership/roles to their Supabase row
+async function _persistOtherParticipant(participant) {
+    try {
+        await getSB().from('participants').update({
+            team_name: (participant.teams && participant.teams[0]) || null,
+            season_setup: participant.seasonSetup || {},
+        }).eq('phone', participant.phone);
+    } catch (e) { /* ignore */ }
+}
+
+// Anyone can add anyone to a team
+async function addMemberToTeam(phone, teamName) {
+    const target = appState.participants.find(p => p.phone === phone);
+    if (!target) return;
+    if (userInTeam(target, teamName)) { showToast(`${(target.name || '').split(' ')[0]} is already in the team`, ''); return; }
+    if (phone === appState.currentUser?.phone) { joinTeam(teamName); return; }
+    const teams = getUserTeams(target).slice(); teams.push(teamName);
+    target.teams = teams;
+    target.teamName = teams[0] || target.teamName;
+    if (!target.seasonSetup) target.seasonSetup = {};
+    target.seasonSetup.teams = teams.slice();
+    _setTeamRole(target, teamName, getUserTeamRole(target, teamName) || 'member');
+    await _persistOtherParticipant(target);
+    showToast(`Added ${(target.name || '').split(' ')[0]} to ${teamName} 👥`, 'success');
+    showTeamDetail(teamName);
+}
+
+// Only an admin can remove a member
+async function removeMemberFromTeam(phone, teamName) {
+    if (!isTeamAdmin(appState.currentUser, teamName)) { showToast('Only a team admin can remove members', 'error'); return; }
+    const target = appState.participants.find(p => p.phone === phone);
+    if (!target) return;
+    if (!confirm(`Remove ${(target.name || '').split(' ')[0]} from "${teamName}"?`)) return;
+    const k = _teamKey(teamName);
+    target.teams = getUserTeams(target).filter(t => _teamKey(t) !== k);
+    target.teamName = target.teams[0] || null;
+    if (target.seasonSetup) {
+        target.seasonSetup.teams = target.teams.slice();
+        if (target.seasonSetup.teamRoles) delete target.seasonSetup.teamRoles[k];
+    }
+    await _persistOtherParticipant(target);
+    showToast(`Removed ${(target.name || '').split(' ')[0]}`, 'success');
+    showTeamDetail(teamName);
+}
+
+// Only an admin can promote another member to admin
+async function makeTeamAdmin(phone, teamName) {
+    if (!isTeamAdmin(appState.currentUser, teamName)) { showToast('Only an admin can add admins', 'error'); return; }
+    const target = appState.participants.find(p => p.phone === phone);
+    if (!target || !userInTeam(target, teamName)) return;
+    _setTeamRole(target, teamName, 'admin');
+    await _persistOtherParticipant(target);
+    showToast(`${(target.name || '').split(' ')[0]} is now a team admin 👑`, 'success');
+    showTeamDetail(teamName);
+}
+
+// Admin can step someone down (never the last admin)
+async function removeTeamAdmin(phone, teamName) {
+    if (!isTeamAdmin(appState.currentUser, teamName)) { showToast('Only an admin can change admins', 'error'); return; }
+    if (_teamAdminCount(teamName) <= 1) { showToast('A team needs at least one admin', 'error'); return; }
+    const target = appState.participants.find(p => p.phone === phone);
+    if (!target) return;
+    _setTeamRole(target, teamName, 'member');
+    // if demoting self, also sync currentUser
+    if (phone === appState.currentUser?.phone) {
+        _setTeamRole(appState.currentUser, teamName, 'member');
+        saveData(); supabaseSaveProfile(appState.currentUser).catch(() => {});
+    } else {
+        await _persistOtherParticipant(target);
+    }
+    showToast(`${(target.name || '').split(' ')[0]} is no longer an admin`, 'success');
+    showTeamDetail(teamName);
 }
 
 function _getTeamsMap() {
@@ -5552,6 +5724,12 @@ window.confirmCreateTeam = confirmCreateTeam;
 window.joinTeam = joinTeam;
 window.leaveTeam = leaveTeam;
 window.confirmLeaveTeam = confirmLeaveTeam;
+window.showAddTeamMembers = showAddTeamMembers;
+window.addMemberToTeam = addMemberToTeam;
+window.removeMemberFromTeam = removeMemberFromTeam;
+window.makeTeamAdmin = makeTeamAdmin;
+window.removeTeamAdmin = removeTeamAdmin;
+window._filterAddMembers = _filterAddMembers;
 window.showS6HistoryModal = showS6HistoryModal;
 window.showS6ParticipantCalendar = showS6ParticipantCalendar;
 window.showMyWorkouts = showMyWorkouts;

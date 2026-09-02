@@ -4413,8 +4413,77 @@ body.modal-open .hamburger-btn { display: none; }
     flex-shrink: 0;
 }
 .tps-member-name { flex: 1; font-size: 15px; font-weight: 500; }
+.tps-member-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.tps-member-main .tps-member-name { flex: none; }
 .tps-you-tag { font-weight: 400; color: var(--text-secondary); font-size: 13px; }
 .tps-member-stat { font-size: 13px; color: var(--text-secondary); white-space: nowrap; }
+
+/* Team roles + admin controls */
+.tps-admin-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 1px 7px;
+    border-radius: 8px;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+.tps-member-controls { display: flex; flex-wrap: wrap; gap: 6px; }
+.tps-mbtn {
+    background: var(--bg-subtle);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: 8px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.tps-mbtn-danger { color: #ef4444; border-color: rgba(239,68,68,0.4); }
+.tps-mbtn:active { transform: scale(0.96); }
+
+.tps-section-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.tps-add-btn {
+    background: rgba(5,150,105,0.1);
+    border: 1px solid rgba(5,150,105,0.3);
+    color: var(--primary);
+    border-radius: 10px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.tps-add-search {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+.tps-add-list { display: flex; flex-direction: column; }
+.tps-add-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+.tps-add-one {
+    background: var(--primary);
+    border: none;
+    color: #fff;
+    border-radius: 10px;
+    padding: 6px 16px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
 .tps-join-btn {
     width: 100%;
     background: var(--primary, #6c63ff);
